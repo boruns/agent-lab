@@ -50,7 +50,7 @@ class Agent:
         """Run until the model answers or the step budget is exhausted.
 
         This method is intentionally left as the first exercise. Read
-        docs/01-minimal-react-agent.md, then make the tests pass without
+        docs/01-foundations/01-minimal-react-agent.md, then make the tests pass without
         changing the public contracts.
         """
         history: list[Message] = [Message(role="user", content=question)]

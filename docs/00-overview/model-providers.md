@@ -1,5 +1,9 @@
 # 模型 Provider 约定：DeepSeek 优先，OpenAI 备用
 
+> **文档类型**：架构决策  
+> **状态**：约定完成，Adapter 尚未实现  
+> **导航**：[文档中心](../README.md) · [系统课程总纲](curriculum.md)
+
 ## 决策
 
 本项目默认接入 DeepSeek，OpenAI 作为可切换的备用 Provider：

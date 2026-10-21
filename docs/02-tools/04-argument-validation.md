@@ -1,5 +1,10 @@
 # 第 4 课：执行前校验工具参数
 
+> **阶段**：2 · 可靠工具系统  
+> **状态**：进行中  
+> **前置**：第 3 课的工具 JSON Schema  
+> **导航**：[文档中心](../README.md) · [上一课](03-json-schema.md) · [课程总纲](../00-overview/curriculum.md)
+
 ## 本课要解决的问题
 
 第 3 课把 JSON Schema 交给了模型，但“告诉模型应该怎么做”不等于“模型一定会这么做”。
@@ -7,7 +12,7 @@
 
 ```python
 ToolCall("weather", {"city": 42})  # 类型错误
-ToolCall("weather", {})  # 缑少必填字段
+ToolCall("weather", {})  # 缺少必填字段
 ToolCall("weather", {"city": "上海", "x": 1})  # 出现额外字段
 ```
 

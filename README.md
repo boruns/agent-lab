@@ -6,7 +6,7 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 ## 当前进度
 
 - 阶段 0：学习路线与工程约定（已完成）
-- 模型 Provider：DeepSeek 优先，OpenAI 备用（约定已完成，适配器待第 2 阶段实现）
+- 模型 Provider：DeepSeek 优先，OpenAI 备用（约定已完成，适配器待阶段 3 实现）
 - 阶段 1 / 第 1 课：最小 ReAct 循环（已完成）
 - 阶段 2 / 第 2 课：工具契约与安全执行（已完成）
 - 阶段 2 / 第 3 课：JSON Schema 工具参数契约（已完成）
@@ -19,29 +19,31 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 
 - Go：并发编排、任务调度、工作流与多 Agent 协作。
 - Rust：工具执行边界、资源限制、沙箱与高可靠运行时。
+- Desktop：Tauri v2 + Rust + Vue 3 + TypeScript + Element Plus，作为后期控制面。
 
 语言是解决问题的手段，不是学习目标本身。
 
-## 开始第一课
+## 当前课程
 
 ```bash
 uv sync
 uv run pytest
 ```
 
-当前新增的参数校验测试会按设计失败：它们对应第四道练习——在工具执行前验证 Schema 和
-实际参数。阅读 [`docs/04-tool-argument-validation.md`](docs/04-tool-argument-validation.md)
-后完成它。
+当前新增的参数校验测试会按设计失败：它们对应第 4 课——在工具执行前验证 Schema 和实际
+参数。阅读
+[`docs/02-tools/04-argument-validation.md`](docs/02-tools/04-argument-validation.md) 后完成它。
+
+完整课程已经按能力依赖重构为 13 个阶段。阶段顺序、验收项目和语言选择见
+[`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)。当前只需关注正在进行的一课，
+不必一次预习全部主题。
 
 ## 文档
 
-- [`docs/00-python-environment.md`](docs/00-python-environment.md)：uv、Python 与依赖管理约定
-- [`docs/00-model-providers.md`](docs/00-model-providers.md)：DeepSeek 优先与 OpenAI 备用策略
-- [`docs/00-learning-roadmap.md`](docs/00-learning-roadmap.md)：完整路线、语言选择和阶段产物
-- [`docs/01-minimal-react-agent.md`](docs/01-minimal-react-agent.md)：Agent 本质与最小 ReAct 循环
-- [`docs/02-tool-contracts.md`](docs/02-tool-contracts.md)：工具契约、不可信输入与 AST 白名单
-- [`docs/03-tool-json-schema.md`](docs/03-tool-json-schema.md)：JSON Schema 与 Function Calling 前置契约
-- [`docs/04-tool-argument-validation.md`](docs/04-tool-argument-validation.md)：Schema 校验与执行边界
+- [`docs/README.md`](docs/README.md)：文档中心、当前课程和分类目录
+- [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)：系统课程总纲与阶段验收
+- [`docs/00-overview/desktop-ui.md`](docs/00-overview/desktop-ui.md)：Desktop 技术选型与架构边界
+- [`docs/02-tools/04-argument-validation.md`](docs/02-tools/04-argument-validation.md)：当前课程
 
 ## 参考资料
 

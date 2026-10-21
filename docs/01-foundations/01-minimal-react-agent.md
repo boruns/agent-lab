@@ -1,5 +1,10 @@
 # 第 1 课：Agent 的本质与最小 ReAct 循环
 
+> **阶段**：1 · Agent 基础  
+> **状态**：已完成  
+> **前置**：Python 环境与基础类型知识  
+> **导航**：[文档中心](../README.md) · [课程总纲](../00-overview/curriculum.md) · [下一课](../02-tools/02-safe-tool-execution.md)
+
 ## 本课目标
 
 完成这一课后，你应该能：
