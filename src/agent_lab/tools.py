@@ -33,6 +33,8 @@ class CalculatorTool:
 
     name = "calculator"
     description = "Evaluate arithmetic using +, -, *, /, unary signs, and parentheses."
+
+    # schema for the arguments that this tool expects
     parameters: ClassVar[Mapping[str, Any]] = {
         "type": "object",
         "properties": {

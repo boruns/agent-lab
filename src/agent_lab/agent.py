@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError, ValidationError
+
 from .contracts import (
     FinalAnswer,
     Message,
@@ -42,8 +45,21 @@ class Agent:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
 
+        self._tools: dict[str, tuple[Tool, Draft202012Validator]] = {}
+        for tool in tools:
+            try:
+                Draft202012Validator.check_schema(tool.parameters)
+                validator = Draft202012Validator(tool.parameters)
+                self._tools[tool.name] = (
+                    tool,
+                    validator,
+                )
+            except SchemaError as e:
+                raise InvalidToolSchemaError(
+                    f"tool {tool.name} schema error: {e.message}"
+                ) from e
+
         self._model = model
-        self._tools = {tool.name: tool for tool in tools}
         self._max_steps = max_steps
 
     def run(self, question: str) -> RunResult:
@@ -58,7 +74,7 @@ class Agent:
             ToolDefinition(
                 name=tool.name, description=tool.description, parameters=tool.parameters
             )
-            for tool in self._tools.values()
+            for tool, _ in self._tools.values()
         )
         for step in range(self._max_steps):
             decision = self._model.decide(history, tools)
@@ -70,11 +86,18 @@ class Agent:
                     messages=tuple(history),
                 )
             if isinstance(decision, ToolCall):
-                tool = self._tools.get(decision.name)
-                if tool is None:
+                result = self._tools.get(decision.name)
+                if result is None:
                     raise UnknownToolError(
                         f"Model requested unknown tool: {decision.name}"
                     )
+                tool, validator = result
+                try:
+                    validator.validate(dict(decision.arguments))
+                except ValidationError as e:
+                    raise ToolArgumentsValidationError(
+                        f"tool {decision.name} arguments validation error: {e.message}"
+                    ) from e
                 observation = tool.run(decision.arguments)
                 history.append(
                     Message(role="tool", content=observation, name=tool.name)
