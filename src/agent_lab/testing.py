@@ -6,7 +6,7 @@ from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from .contracts import Decision, Message, ToolDefinition
+from .contracts import Decision, Message, ToolDefinition, ToolResult
 
 
 class ScriptedModel:
@@ -33,13 +33,15 @@ class RecordingTool:
     def __init__(
         self,
         name: str,
-        result: str,
+        result: str | ToolResult,
         description: str = "test tool",
         parameters: Mapping[str, Any] | None = None,
     ) -> None:
         self.name = name
         self.description = description
-        self.result = result
+        self.result = (
+            result if isinstance(result, ToolResult) else ToolResult.success(result)
+        )
         self.calls: list[dict[str, Any]] = []
         self.parameters = (
             parameters
@@ -50,6 +52,6 @@ class RecordingTool:
             }
         )
 
-    def run(self, arguments: Mapping[str, Any]) -> str:
+    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
         self.calls.append(dict(arguments))
         return self.result

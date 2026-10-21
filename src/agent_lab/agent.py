@@ -15,6 +15,8 @@ from .contracts import (
     Tool,
     ToolCall,
     ToolDefinition,
+    ToolErrorKind,
+    ToolResult,
 )
 
 
@@ -30,8 +32,12 @@ class InvalidToolSchemaError(ValueError):
     """Raised when a tool declares an invalid JSON Schema."""
 
 
-class ToolArgumentsValidationError(ValueError):
-    """Raised before execution when tool arguments do not match its schema."""
+def _format_tool_result(result: ToolResult) -> str:
+    if result.error is not None:
+        return f"Tool error [{result.error.kind.value}]: {result.error.message}"
+
+    assert result.output is not None
+    return result.output
 
 
 class Agent:
@@ -86,20 +92,28 @@ class Agent:
                     messages=tuple(history),
                 )
             if isinstance(decision, ToolCall):
-                result = self._tools.get(decision.name)
-                if result is None:
+                tool_entry = self._tools.get(decision.name)
+                if tool_entry is None:
                     raise UnknownToolError(
                         f"Model requested unknown tool: {decision.name}"
                     )
-                tool, validator = result
+                tool, validator = tool_entry
                 try:
                     validator.validate(dict(decision.arguments))
                 except ValidationError as e:
-                    raise ToolArgumentsValidationError(
-                        f"tool {decision.name} arguments validation error: {e.message}"
-                    ) from e
-                observation = tool.run(decision.arguments)
+                    tool_result = ToolResult.failure(
+                        ToolErrorKind.INVALID_ARGUMENTS,
+                        e.message,
+                    )
+                else:
+                    tool_result = tool.run(decision.arguments)
+
                 history.append(
-                    Message(role="tool", content=observation, name=tool.name)
+                    Message(
+                        role="tool",
+                        content=_format_tool_result(tool_result),
+                        name=tool.name,
+                    )
                 )
+
         raise StepLimitExceeded("Step limit exceeded")

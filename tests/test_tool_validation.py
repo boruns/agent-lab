@@ -5,7 +5,6 @@ from agent_lab import (
     Agent,
     FinalAnswer,
     InvalidToolSchemaError,
-    ToolArgumentsValidationError,
     ToolCall,
 )
 from agent_lab.testing import RecordingTool, ScriptedModel
@@ -75,21 +74,29 @@ class ToolValidationTests(unittest.TestCase):
         self.assertEqual("上海天气已查询", result.answer)
         self.assertEqual([{"city": "Shanghai"}], weather.calls)
 
-    def test_invalid_arguments_are_rejected_before_execution(self) -> None:
-        model = ScriptedModel([ToolCall("weather", {"city": 42})])
+    def test_invalid_arguments_are_returned_to_the_model_for_correction(self) -> None:
+        model = ScriptedModel(
+            [
+                ToolCall("weather", {"city": 42}),
+                ToolCall("weather", {"city": "Shanghai"}),
+                FinalAnswer("上海天气已查询"),
+            ]
+        )
         weather = RecordingTool(
             "weather",
-            "should not execute",
+            "sunny",
             parameters=CITY_PARAMETERS,
         )
 
-        with self.assertRaisesRegex(
-            ToolArgumentsValidationError,
-            "weather",
-        ):
-            Agent(model, [weather]).run("查询城市 42 的天气")
+        result = Agent(model, [weather]).run("查询上海的天气")
 
-        self.assertEqual([], weather.calls)
+        self.assertEqual("上海天气已查询", result.answer)
+        self.assertEqual([{"city": "Shanghai"}], weather.calls)
+        error_observation = model.calls[1][0][-1]
+        self.assertEqual("tool", error_observation.role)
+        self.assertEqual("weather", error_observation.name)
+        self.assertIn("invalid_arguments", error_observation.content)
+        self.assertIn("42 is not of type 'string'", error_observation.content)
 
     def test_invalid_tool_schema_is_rejected_during_agent_setup(self) -> None:
         invalid_schema = {

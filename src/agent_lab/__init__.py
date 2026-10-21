@@ -4,10 +4,17 @@ from .agent import (
     Agent,
     InvalidToolSchemaError,
     StepLimitExceeded,
-    ToolArgumentsValidationError,
     UnknownToolError,
 )
-from .contracts import FinalAnswer, Message, RunResult, ToolCall
+from .contracts import (
+    FinalAnswer,
+    Message,
+    RunResult,
+    ToolCall,
+    ToolError,
+    ToolErrorKind,
+    ToolResult,
+)
 from .tools import CalculatorTool, InvalidToolArguments, UnsafeExpressionError
 
 __all__ = [
@@ -19,8 +26,10 @@ __all__ = [
     "Message",
     "RunResult",
     "StepLimitExceeded",
-    "ToolArgumentsValidationError",
     "ToolCall",
+    "ToolError",
+    "ToolErrorKind",
+    "ToolResult",
     "UnknownToolError",
     "UnsafeExpressionError",
 ]

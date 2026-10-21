@@ -7,6 +7,8 @@ import operator
 from collections.abc import Callable, Mapping
 from typing import Any, ClassVar, cast
 
+from .contracts import ToolErrorKind, ToolResult
+
 _BINARY_OPERATORS: dict[type[ast.operator], Callable[[float, float], float]] = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -47,22 +49,32 @@ class CalculatorTool:
         "additionalProperties": False,
     }
 
-    def run(self, arguments: Mapping[str, Any]) -> str:
+    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
         """Validate and evaluate the expression from ``arguments``.
 
         This method is intentionally left as the lesson 2 exercise. Do not use
         eval() or exec(). Parse the expression with ast.parse(..., mode="eval")
         and recursively evaluate only the syntax explicitly allowed above.
         """
-        expression = arguments.get("expression")
-        if not isinstance(expression, str):
-            raise InvalidToolArguments("Missing or invalid 'expression' argument")
         try:
+            expression = arguments.get("expression")
+            if not isinstance(expression, str):
+                raise InvalidToolArguments("Missing or invalid 'expression' argument")
             tree = ast.parse(expression, mode="eval")
+            result = self._evaluate(tree.body)
         except SyntaxError as e:
-            raise UnsafeExpressionError(f"Invalid syntax in expression: {e}") from e
-        result = self._evaluate(tree.body)
-        return str(result)
+            return ToolResult.failure(
+                ToolErrorKind.INVALID_ARGUMENTS,
+                f"Invalid syntax in expression: {e}",
+            )
+        except (InvalidToolArguments, UnsafeExpressionError) as e:
+            return ToolResult.failure(
+                ToolErrorKind.INVALID_ARGUMENTS,
+                str(e),
+            )
+        except ZeroDivisionError as e:
+            return ToolResult.failure(ToolErrorKind.EXECUTION_ERROR, str(e))
+        return ToolResult.success(str(result))
 
     def _evaluate(self, node: ast.expr) -> int | float:
         # 数字常量
