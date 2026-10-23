@@ -7,6 +7,8 @@ from agent_lab import (
     FinalAnswer,
     ToolCall,
     ToolErrorKind,
+    ToolExecutionContext,
+    ToolPermission,
     ToolResult,
 )
 from agent_lab.testing import RecordingTool, ScriptedModel
@@ -15,12 +17,19 @@ from agent_lab.testing import RecordingTool, ScriptedModel
 class ExplodingTool:
     name = "exploding"
     description = "Raise an unexpected programming error"
+    permission = ToolPermission.READ
+    supports_idempotency = False
     parameters: ClassVar[Mapping[str, Any]] = {
         "type": "object",
         "additionalProperties": False,
     }
 
-    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
+    def run(
+        self,
+        arguments: Mapping[str, Any],
+        *,
+        context: ToolExecutionContext | None = None,
+    ) -> ToolResult:
         raise RuntimeError("unexpected bug")
 
 

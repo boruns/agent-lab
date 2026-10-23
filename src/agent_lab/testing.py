@@ -6,7 +6,14 @@ from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from .contracts import Decision, Message, ToolDefinition, ToolResult
+from .contracts import (
+    Decision,
+    Message,
+    ToolDefinition,
+    ToolExecutionContext,
+    ToolPermission,
+    ToolResult,
+)
 
 
 class ScriptedModel:
@@ -36,6 +43,8 @@ class RecordingTool:
         result: str | ToolResult,
         description: str = "test tool",
         parameters: Mapping[str, Any] | None = None,
+        permission: ToolPermission = ToolPermission.READ,
+        supports_idempotency: bool = False,
     ) -> None:
         self.name = name
         self.description = description
@@ -43,6 +52,9 @@ class RecordingTool:
             result if isinstance(result, ToolResult) else ToolResult.success(result)
         )
         self.calls: list[dict[str, Any]] = []
+        self.contexts: list[ToolExecutionContext] = []
+        self.permission = permission
+        self.supports_idempotency = supports_idempotency
         self.parameters = (
             parameters
             if parameters is not None
@@ -52,8 +64,14 @@ class RecordingTool:
             }
         )
 
-    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
+    def run(
+        self,
+        arguments: Mapping[str, Any],
+        *,
+        context: ToolExecutionContext | None = None,
+    ) -> ToolResult:
         self.calls.append(dict(arguments))
+        self.contexts.append(context or ToolExecutionContext())
         return self.result
 
 
@@ -66,11 +84,16 @@ class ScriptedTool:
         results: Iterable[ToolResult],
         description: str = "test tool",
         parameters: Mapping[str, Any] | None = None,
+        permission: ToolPermission = ToolPermission.READ,
+        supports_idempotency: bool = False,
     ) -> None:
         self.name = name
         self.description = description
         self._results = deque(results)
         self.calls: list[dict[str, Any]] = []
+        self.contexts: list[ToolExecutionContext] = []
+        self.permission = permission
+        self.supports_idempotency = supports_idempotency
         self.parameters = (
             parameters
             if parameters is not None
@@ -80,8 +103,14 @@ class ScriptedTool:
             }
         )
 
-    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
+    def run(
+        self,
+        arguments: Mapping[str, Any],
+        *,
+        context: ToolExecutionContext | None = None,
+    ) -> ToolResult:
         self.calls.append(dict(arguments))
+        self.contexts.append(context or ToolExecutionContext())
         if not self._results:
             raise AssertionError("ScriptedTool ran out of results")
         return self._results.popleft()

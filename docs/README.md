@@ -8,9 +8,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 当前阶段 | 阶段 2：可靠工具系统 |
-| 当前课程 | [第 6 课：可重试错误、退避、超时与取消](02-tools/06-retries-timeouts-cancellation.md) |
-| 已完成 | 环境、最小 ReAct、安全工具、JSON Schema、参数校验、结构化工具结果 |
-| 下一课 | 副作用、幂等键、确认机制与权限分级 |
+| 当前课程 | [第 7 课：副作用、幂等键、确认与权限分级](02-tools/07-side-effects-and-permissions.md) |
+| 已完成 | 环境、ReAct、安全工具、Schema、参数校验、结构化结果、重试与取消 |
+| 下一课 | Tool Registry、命名空间与生命周期 |
 
 运行当前验收：
 
@@ -47,7 +47,8 @@ docs/
     ├── 03-json-schema.md
     ├── 04-argument-validation.md
     ├── 05-tool-results.md
-    └── 06-retries-timeouts-cancellation.md
+    ├── 06-retries-timeouts-cancellation.md
+    └── 07-side-effects-and-permissions.md
 ```
 
 未来阶段只在真正开始时创建目录，避免出现大量空目录。
@@ -72,7 +73,8 @@ docs/
 - [第 3 课：用 JSON Schema 描述工具参数](02-tools/03-json-schema.md) — 已完成
 - [第 4 课：执行前校验工具参数](02-tools/04-argument-validation.md) — 已完成
 - [第 5 课：结构化 ToolResult 与工具错误分类](02-tools/05-tool-results.md) — 已完成
-- [第 6 课：可重试错误、退避、超时与取消](02-tools/06-retries-timeouts-cancellation.md) — 进行中
+- [第 6 课：可重试错误、退避、超时与取消](02-tools/06-retries-timeouts-cancellation.md) — 已完成
+- [第 7 课：副作用、幂等键、确认与权限分级](02-tools/07-side-effects-and-permissions.md) — 进行中
 
 ## 文档约定
 

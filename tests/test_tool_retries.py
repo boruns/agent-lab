@@ -54,9 +54,9 @@ class AdvancingTool(ScriptedTool):
         self._clock = clock
         self._advance = advance
 
-    def run(self, arguments):
+    def run(self, arguments, *, context=None):
         self._clock.current += self._advance
-        return super().run(arguments)
+        return super().run(arguments, context=context)
 
 
 def retryable_failure(message: str = "temporary outage") -> ToolResult:

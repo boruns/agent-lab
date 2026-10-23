@@ -7,7 +7,12 @@ import operator
 from collections.abc import Callable, Mapping
 from typing import Any, ClassVar, cast
 
-from .contracts import ToolErrorKind, ToolResult
+from .contracts import (
+    ToolErrorKind,
+    ToolExecutionContext,
+    ToolPermission,
+    ToolResult,
+)
 
 _BINARY_OPERATORS: dict[type[ast.operator], Callable[[float, float], float]] = {
     ast.Add: operator.add,
@@ -35,6 +40,8 @@ class CalculatorTool:
 
     name = "calculator"
     description = "Evaluate arithmetic using +, -, *, /, unary signs, and parentheses."
+    permission = ToolPermission.READ
+    supports_idempotency = False
 
     # schema for the arguments that this tool expects
     parameters: ClassVar[Mapping[str, Any]] = {
@@ -49,7 +56,12 @@ class CalculatorTool:
         "additionalProperties": False,
     }
 
-    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
+    def run(
+        self,
+        arguments: Mapping[str, Any],
+        *,
+        context: ToolExecutionContext | None = None,
+    ) -> ToolResult:
         """Validate and evaluate the expression from ``arguments``.
 
         This method is intentionally left as the lesson 2 exercise. Do not use

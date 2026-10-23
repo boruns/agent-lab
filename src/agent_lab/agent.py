@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping
+from uuid import uuid4
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
@@ -17,8 +18,11 @@ from .contracts import (
     RunResult,
     Tool,
     ToolCall,
+    ToolConfirmationRequest,
     ToolDefinition,
     ToolErrorKind,
+    ToolExecutionContext,
+    ToolPermission,
     ToolResult,
 )
 
@@ -39,6 +43,18 @@ class AgentTimeoutError(TimeoutError):
 
 class AgentCancelledError(RuntimeError):
     """Raised when a caller requests cooperative cancellation."""
+
+
+class ToolPermissionDeniedError(PermissionError):
+    """Raised when the host did not grant a tool's permission class."""
+
+
+class ToolConfirmationRequiredError(PermissionError):
+    """Raised when a write call has no confirmation handler."""
+
+
+class ToolConfirmationRejectedError(PermissionError):
+    """Raised when a write call is explicitly rejected."""
 
 
 class InvalidToolSchemaError(ValueError):
@@ -63,6 +79,9 @@ class Agent:
         retry_policy: RetryPolicy | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        allowed_permissions: Iterable[ToolPermission] = (ToolPermission.READ,),
+        confirmation_handler: Callable[[ToolConfirmationRequest], bool] | None = None,
+        idempotency_key_factory: Callable[[], str] = lambda: uuid4().hex,
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
@@ -86,6 +105,9 @@ class Agent:
         self._retry_policy = retry_policy if retry_policy is not None else RetryPolicy()
         self._clock = clock
         self._sleep = sleep
+        self._allowed_permissions = frozenset(allowed_permissions)
+        self._confirmation_handler = confirmation_handler
+        self._idempotency_key_factory = idempotency_key_factory
 
     def run(
         self,
@@ -127,6 +149,12 @@ class Agent:
                         f"Model requested unknown tool: {decision.name}"
                     )
                 tool, validator = tool_entry
+                # 判断 tool 的权限是否在授权集合中
+                if tool.permission not in self._allowed_permissions:
+                    raise ToolPermissionDeniedError(
+                        f"Tool: {tool.name} permission not allow "
+                    )
+
                 try:
                     validator.validate(dict(decision.arguments))
                 except ValidationError as e:
@@ -136,11 +164,28 @@ class Agent:
                         e.message,
                     )
                 else:
+                    idempotency_key = None
+                    if tool.permission is ToolPermission.WRITE:
+                        if self._confirmation_handler is None:
+                            raise ToolConfirmationRequiredError(
+                                f"Tool: {tool.name} permission is write, confirmation handler is none"
+                            )
+                        idempotency_key = self._idempotency_key_factory()
+                        if not self._confirmation_handler(
+                            ToolConfirmationRequest(
+                                decision.name, dict(decision.arguments), idempotency_key
+                            )
+                        ):
+                            raise ToolConfirmationRejectedError(
+                                f"Tool: {decision.name} confirmation hand is rejected"
+                            )
+
                     tool_result = self._run_tool_with_retries(
                         tool,
                         decision.arguments,
                         deadline,
                         cancellation_token,
+                        idempotency_key,
                     )
 
                 history.append(
@@ -159,15 +204,26 @@ class Agent:
         arguments: Mapping[str, object],
         deadline: Deadline,
         cancellation_token: CancellationToken | None,
+        idempotency_key: str | None,
     ) -> ToolResult:
         for attempt in range(1, self._retry_policy.max_attempts + 1):
             self._raise_if_stopped(deadline, cancellation_token)
-            result = tool.run(arguments)
+            context = ToolExecutionContext(
+                attempt=attempt,
+                idempotency_key=idempotency_key,
+            )
+            result = tool.run(arguments, context=context)
             self._raise_if_stopped(deadline, cancellation_token)
 
             if result.error is None or not result.error.retryable:
                 return result
             if attempt == self._retry_policy.max_attempts:
+                return result
+
+            if (
+                tool.permission is ToolPermission.WRITE
+                and not tool.supports_idempotency
+            ):
                 return result
 
             delay = self._retry_policy.delay_after(attempt)

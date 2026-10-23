@@ -18,6 +18,34 @@ class ToolErrorKind(StrEnum):
     EXECUTION_ERROR = "execution_error"
 
 
+class ToolPermission(StrEnum):
+    """The highest class of effect a tool may perform."""
+
+    READ = "read"
+    WRITE = "write"
+
+
+@dataclass(frozen=True)
+class ToolExecutionContext:
+    """Host-owned metadata for one physical tool attempt."""
+
+    attempt: int = 1
+    idempotency_key: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.attempt < 1:
+            raise ValueError("attempt must be at least 1")
+
+
+@dataclass(frozen=True)
+class ToolConfirmationRequest:
+    """A valid write call awaiting a host-controlled decision."""
+
+    tool_name: str
+    arguments: Mapping[str, Any]
+    idempotency_key: str
+
+
 @dataclass(frozen=True)
 class ToolError:
     kind: ToolErrorKind
@@ -130,15 +158,24 @@ class Model(Protocol):
         tools: Sequence[ToolDefinition],
     ) -> Decision:
         """Choose a tool call or return a final answer."""
+        ...
 
 
 class Tool(Protocol):
     name: str
     description: str
     parameters: Mapping[str, Any]
+    permission: ToolPermission
+    supports_idempotency: bool
 
-    def run(self, arguments: Mapping[str, Any]) -> ToolResult:
+    def run(
+        self,
+        arguments: Mapping[str, Any],
+        *,
+        context: ToolExecutionContext | None = None,
+    ) -> ToolResult:
         """Execute the tool and return a structured expected outcome."""
+        ...
 
 
 @dataclass(frozen=True)
