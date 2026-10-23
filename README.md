@@ -11,7 +11,8 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 - 阶段 2 / 第 2 课：工具契约与安全执行（已完成）
 - 阶段 2 / 第 3 课：JSON Schema 工具参数契约（已完成）
 - 阶段 2 / 第 4 课：执行前参数校验（已完成）
-- 阶段 2 / 第 5 课：结构化 ToolResult 与工具错误分类（进行中）
+- 阶段 2 / 第 5 课：结构化 ToolResult 与工具错误分类（已完成）
+- 阶段 2 / 第 6 课：可重试错误、退避、超时与取消（进行中）
 
 ## 为什么先用 Python
 
@@ -31,9 +32,10 @@ uv sync
 uv run pytest
 ```
 
-当前新增的结果契约测试会按设计失败：它们对应第 5 课——用结构化结果表示工具成功与预期
-失败，并把分类后的错误反馈给模型。阅读
-[`docs/02-tools/05-tool-results.md`](docs/02-tools/05-tool-results.md) 后完成它。
+当前新增的可靠性测试会按设计失败：它们对应第 6 课——为可重试工具错误增加有界退避，并让
+超时和取消保持在宿主控制之下。阅读
+[`docs/02-tools/06-retries-timeouts-cancellation.md`](docs/02-tools/06-retries-timeouts-cancellation.md)
+后完成它。
 
 完整课程已经按能力依赖重构为 13 个阶段。阶段顺序、验收项目和语言选择见
 [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)。当前只需关注正在进行的一课，
@@ -44,7 +46,7 @@ uv run pytest
 - [`docs/README.md`](docs/README.md)：文档中心、当前课程和分类目录
 - [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)：系统课程总纲与阶段验收
 - [`docs/00-overview/desktop-ui.md`](docs/00-overview/desktop-ui.md)：Desktop 技术选型与架构边界
-- [`docs/02-tools/05-tool-results.md`](docs/02-tools/05-tool-results.md)：当前课程
+- [`docs/02-tools/06-retries-timeouts-cancellation.md`](docs/02-tools/06-retries-timeouts-cancellation.md)：当前课程
 
 ## 参考资料
 

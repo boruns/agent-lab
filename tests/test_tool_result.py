@@ -36,12 +36,14 @@ class ToolResultTests(unittest.TestCase):
         result = ToolResult.failure(
             ToolErrorKind.EXECUTION_ERROR,
             "weather service unavailable",
+            retryable=True,
         )
 
         self.assertFalse(result.is_success)
         self.assertIsNone(result.output)
         self.assertEqual(ToolErrorKind.EXECUTION_ERROR, result.error.kind)
         self.assertEqual("weather service unavailable", result.error.message)
+        self.assertTrue(result.error.retryable)
 
     def test_result_rejects_ambiguous_states(self) -> None:
         with self.assertRaises(ValueError):
