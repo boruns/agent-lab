@@ -4,7 +4,6 @@ from .agent import (
     Agent,
     AgentCancelledError,
     AgentTimeoutError,
-    InvalidToolSchemaError,
     StepLimitExceeded,
     ToolConfirmationRejectedError,
     ToolConfirmationRequiredError,
@@ -14,6 +13,7 @@ from .agent import (
 from .contracts import (
     CancellationToken,
     FinalAnswer,
+    ManagedTool,
     Message,
     RetryPolicy,
     RunResult,
@@ -25,6 +25,16 @@ from .contracts import (
     ToolPermission,
     ToolResult,
 )
+from .registry import (
+    DuplicateToolError,
+    InvalidToolNameError,
+    InvalidToolSchemaError,
+    RegisteredTool,
+    ToolRegistration,
+    ToolRegistry,
+    ToolRegistryState,
+    ToolRegistryStateError,
+)
 from .tools import CalculatorTool, InvalidToolArguments, UnsafeExpressionError
 
 __all__ = [
@@ -33,10 +43,14 @@ __all__ = [
     "AgentTimeoutError",
     "CalculatorTool",
     "CancellationToken",
+    "DuplicateToolError",
     "FinalAnswer",
     "InvalidToolArguments",
+    "InvalidToolNameError",
     "InvalidToolSchemaError",
+    "ManagedTool",
     "Message",
+    "RegisteredTool",
     "RetryPolicy",
     "RunResult",
     "StepLimitExceeded",
@@ -49,6 +63,10 @@ __all__ = [
     "ToolExecutionContext",
     "ToolPermission",
     "ToolPermissionDeniedError",
+    "ToolRegistration",
+    "ToolRegistry",
+    "ToolRegistryState",
+    "ToolRegistryStateError",
     "ToolResult",
     "UnknownToolError",
     "UnsafeExpressionError",

@@ -13,7 +13,8 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 - 阶段 2 / 第 4 课：执行前参数校验（已完成）
 - 阶段 2 / 第 5 课：结构化 ToolResult 与工具错误分类（已完成）
 - 阶段 2 / 第 6 课：可重试错误、退避、超时与取消（已完成）
-- 阶段 2 / 第 7 课：副作用、幂等键、确认与权限分级（进行中）
+- 阶段 2 / 第 7 课：副作用、幂等键、确认与权限分级（已完成）
+- 阶段 2 / 第 8 课：Tool Registry、命名空间与生命周期（进行中）
 
 ## 为什么先用 Python
 
@@ -33,10 +34,9 @@ uv sync
 uv run pytest
 ```
 
-当前新增的安全策略测试会按设计失败：它们对应第 7 课——区分读写工具、静态授权和逐次确认，
-并用幂等键保护写操作重试。阅读
-[`docs/02-tools/07-side-effects-and-permissions.md`](docs/02-tools/07-side-effects-and-permissions.md)
-后完成它。
+当前新增的 Registry 测试会按设计失败：它们对应第 8 课——处理重复名称、命名空间、稳定工具
+快照和资源生命周期。阅读
+[`docs/02-tools/08-tool-registry.md`](docs/02-tools/08-tool-registry.md) 后完成它。
 
 完整课程已经按能力依赖重构为 13 个阶段。阶段顺序、验收项目和语言选择见
 [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)。当前只需关注正在进行的一课，
@@ -47,7 +47,7 @@ uv run pytest
 - [`docs/README.md`](docs/README.md)：文档中心、当前课程和分类目录
 - [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)：系统课程总纲与阶段验收
 - [`docs/00-overview/desktop-ui.md`](docs/00-overview/desktop-ui.md)：Desktop 技术选型与架构边界
-- [`docs/02-tools/07-side-effects-and-permissions.md`](docs/02-tools/07-side-effects-and-permissions.md)：当前课程
+- [`docs/02-tools/08-tool-registry.md`](docs/02-tools/08-tool-registry.md)：当前课程
 
 ## 参考资料
 

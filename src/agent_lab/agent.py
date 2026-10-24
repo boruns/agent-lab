@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping
+from types import TracebackType
+from typing import Self
 from uuid import uuid4
 
-from jsonschema import Draft202012Validator
-from jsonschema.exceptions import SchemaError, ValidationError
+from jsonschema.exceptions import ValidationError
 
 from .contracts import (
     CancellationToken,
@@ -19,12 +20,12 @@ from .contracts import (
     Tool,
     ToolCall,
     ToolConfirmationRequest,
-    ToolDefinition,
     ToolErrorKind,
     ToolExecutionContext,
     ToolPermission,
     ToolResult,
 )
+from .registry import ToolRegistry, ToolSource
 
 type Deadline = float | None
 
@@ -57,10 +58,6 @@ class ToolConfirmationRejectedError(PermissionError):
     """Raised when a write call is explicitly rejected."""
 
 
-class InvalidToolSchemaError(ValueError):
-    """Raised when a tool declares an invalid JSON Schema."""
-
-
 def _format_tool_result(result: ToolResult) -> str:
     if result.error is not None:
         return f"Tool error [{result.error.kind.value}]: {result.error.message}"
@@ -73,7 +70,7 @@ class Agent:
     def __init__(
         self,
         model: Model,
-        tools: Iterable[Tool] = (),
+        tools: Iterable[ToolSource] = (),
         *,
         max_steps: int = 8,
         retry_policy: RetryPolicy | None = None,
@@ -86,20 +83,8 @@ class Agent:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
 
-        self._tools: dict[str, tuple[Tool, Draft202012Validator]] = {}
-        for tool in tools:
-            try:
-                Draft202012Validator.check_schema(tool.parameters)
-                validator = Draft202012Validator(tool.parameters)
-                self._tools[tool.name] = (
-                    tool,
-                    validator,
-                )
-            except SchemaError as e:
-                raise InvalidToolSchemaError(
-                    f"tool {tool.name} schema error: {e.message}"
-                ) from e
-
+        self._tool_registry = ToolRegistry(tools=tools)
+        self._tool_registry.start()
         self._model = model
         self._max_steps = max_steps
         self._retry_policy = retry_policy if retry_policy is not None else RetryPolicy()
@@ -124,15 +109,10 @@ class Agent:
         self._raise_if_stopped(deadline, cancellation_token)
 
         history: list[Message] = [Message(role="user", content=question)]
-        tools = tuple(
-            ToolDefinition(
-                name=tool.name, description=tool.description, parameters=tool.parameters
-            )
-            for tool, _ in self._tools.values()
-        )
+
         for step in range(self._max_steps):
             self._raise_if_stopped(deadline, cancellation_token)
-            decision = self._model.decide(history, tools)
+            decision = self._model.decide(history, self._tool_registry.definitions())
             self._raise_if_stopped(deadline, cancellation_token)
 
             if isinstance(decision, FinalAnswer):
@@ -143,20 +123,20 @@ class Agent:
                     messages=tuple(history),
                 )
             if isinstance(decision, ToolCall):
-                tool_entry = self._tools.get(decision.name)
-                if tool_entry is None:
+                registerd = self._tool_registry.resolve(decision.name)
+                if registerd is None:
                     raise UnknownToolError(
                         f"Model requested unknown tool: {decision.name}"
                     )
-                tool, validator = tool_entry
+
                 # 判断 tool 的权限是否在授权集合中
-                if tool.permission not in self._allowed_permissions:
+                if registerd.tool.permission not in self._allowed_permissions:
                     raise ToolPermissionDeniedError(
-                        f"Tool: {tool.name} permission not allow "
+                        f"Tool: {registerd.public_name} {registerd.tool.permission} permission not allow "
                     )
 
                 try:
-                    validator.validate(dict(decision.arguments))
+                    registerd.validator.validate(dict(decision.arguments))
                 except ValidationError as e:
                     self._raise_if_stopped(deadline, cancellation_token)
                     tool_result = ToolResult.failure(
@@ -165,23 +145,25 @@ class Agent:
                     )
                 else:
                     idempotency_key = None
-                    if tool.permission is ToolPermission.WRITE:
+                    if registerd.tool.permission is ToolPermission.WRITE:
                         if self._confirmation_handler is None:
                             raise ToolConfirmationRequiredError(
-                                f"Tool: {tool.name} permission is write, confirmation handler is none"
+                                f"Tool: {registerd.public_name} permission is write, confirmation handler is none"
                             )
                         idempotency_key = self._idempotency_key_factory()
                         if not self._confirmation_handler(
                             ToolConfirmationRequest(
-                                decision.name, dict(decision.arguments), idempotency_key
+                                registerd.public_name,
+                                dict(decision.arguments),
+                                idempotency_key,
                             )
                         ):
                             raise ToolConfirmationRejectedError(
-                                f"Tool: {decision.name} confirmation hand is rejected"
+                                f"Tool: {registerd.public_name} confirmation hand is rejected"
                             )
 
                     tool_result = self._run_tool_with_retries(
-                        tool,
+                        registerd.tool,
                         decision.arguments,
                         deadline,
                         cancellation_token,
@@ -192,7 +174,7 @@ class Agent:
                     Message(
                         role="tool",
                         content=_format_tool_result(tool_result),
-                        name=tool.name,
+                        name=registerd.public_name,
                     )
                 )
 
@@ -245,3 +227,17 @@ class Agent:
             raise AgentCancelledError("agent run was cancelled")
         if deadline is not None and self._clock() >= deadline:
             raise AgentTimeoutError("agent run timed out")
+
+    def close(self) -> None:
+        self._tool_registry.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc_value: BaseException | None,
+        _traceback: TracebackType | None,
+    ) -> None:
+        self.close()

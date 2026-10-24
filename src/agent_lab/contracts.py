@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from threading import Event
-from typing import Any, Literal, Protocol, Self
+from typing import Any, Literal, Protocol, Self, runtime_checkable
 
 type Role = Literal["user", "assistant", "tool"]
 
@@ -175,6 +175,19 @@ class Tool(Protocol):
         context: ToolExecutionContext | None = None,
     ) -> ToolResult:
         """Execute the tool and return a structured expected outcome."""
+        ...
+
+
+@runtime_checkable
+class ManagedTool(Protocol):
+    """Optional lifecycle implemented by tools that own external resources."""
+
+    def start(self) -> None:
+        """Acquire resources before the tool becomes available."""
+        ...
+
+    def close(self) -> None:
+        """Release resources; repeated calls must be harmless."""
         ...
 
 
