@@ -2,6 +2,7 @@
 
 > **文档类型**：架构决策  
 > **状态**：约定完成，Adapter 尚未实现  
+> **最后核验**：2026-10-24（以 DeepSeek 和 OpenAI 官方 API 文档为准）
 > **导航**：[文档中心](../README.md) · [系统课程总纲](curriculum.md)
 
 ## 决策
@@ -22,17 +23,22 @@ Model 协议（项目自己的稳定边界）
 Agent 核心只能依赖 `Model` 协议，不能直接依赖 DeepSeek 或 OpenAI SDK。这样切换模型时，
 工具系统、控制循环、预算和记忆逻辑都不需要修改。
 
-## 为什么可以共享大部分适配逻辑
+## 兼容格式不等于相同行为
 
-DeepSeek 提供 OpenAI 兼容的 API 格式，官方 OpenAI 格式 Base URL 是：
+DeepSeek 当前同时提供 OpenAI Chat Completions、OpenAI Responses 和 Anthropic 格式。
+OpenAI 格式 Base URL 是：
 
 ```text
 https://api.deepseek.com
 ```
 
-因此我们可以复用 OpenAI Python SDK 的请求/响应类型和 HTTP 能力，但“协议兼容”不等于
-“行为完全相同”。不同 Provider 的模型名、推理字段、工具调用限制、错误码、速率限制和
-Token 统计仍然需要放在各自的配置或适配层中。
+可以复用官方 SDK 的 HTTP 能力和部分数据形状，但不在 Agent 核心中直接传递 SDK
+对象。不同 Provider 即使使用同一 API 外形，在状态保存、消息角色、推理字段、工具调用限制、
+错误码和 Token 统计上仍可能不同。例如 DeepSeek 当前的 Responses API 是无状态的，
+多轮请求需要客户端重传必要历史。
+
+本项目因此保留独立的 DeepSeek Adapter 和 OpenAI Adapter，并用 Provider 契约测试
+验证各自映射，不实现一个靠 `base_url` 切换的“万能适配器”。
 
 ## 模型选择
 
@@ -44,11 +50,16 @@ Model:    deepseek-flash
 Thinking: disabled
 ```
 
-选择 `deepseek-flash` 是为了以较低成本快速迭代控制循环与工具 Schema。需要更强规划或复杂
-综合能力时，可以通过环境变量切换到 `deepseek-v4-pro`，不修改业务代码。
+截至核验日期，DeepSeek 官方 API 的两个公开模型 ID 是 `deepseek-flash` 和
+`deepseek-v4-pro`。`deepseek-flash` 是指向当前 Flash 版本的别名，不是永久固定的
+权重版本。当前官方页面列出 1M 上下文窗口和最大 384K 输出，但这些数值属于时效
+快照，不会写死在 Agent 核心中。运行时配置必须显式提供模型 ID，评测轨迹应记录
+请求的 ID 和服务端返回的版本信息（如果有）。
 
-第一版关闭 Thinking 的原因不是它不好，而是我们正在学习 Agent 的显式控制循环。先减少
-一个变量，等工具调用、终止条件和 Token 统计稳定后，再对比 Thinking 模式的行为与成本。
+当前 DeepSeek 的 Thinking 默认是启用的；项目中的 `disabled` 是我们将显式发送的
+教学配置，不是对供应商默认值的描述。第一版关闭 Thinking，是为了先减少一个变量；
+等工具调用、终止条件和 Token 统计稳定后，再用同一评测集对比推理努力的质量、成本
+和延迟。不依赖服务端默认值，因为它可能变更。
 
 ## API Key 配置
 
@@ -99,8 +110,8 @@ OpenAI 模型名不在模板中写死。模型供应商会更新可用模型，�
 
 1. 用 `ScriptedModel` 完成并测试 ReAct 控制循环；
 2. 扩展 `ToolDefinition`，加入参数 JSON Schema；
-3. 实现 OpenAI-compatible transport；
-4. 首先完成 DeepSeek Adapter 和一条手动冒烟测试；
+3. 定义 Provider-neutral 的请求、响应和错误契约，不泄漏任一 SDK 类型；
+4. 基于当时的官方文档选择 API 方言，首先完成 DeepSeek Adapter 和一条手动冒烟测试；
 5. 再加入 OpenAI 配置，验证同一 Agent 核心可以切换 Provider；
 6. 所有自动化测试继续使用假模型，避免网络、费用和随机性。
 
@@ -112,3 +123,11 @@ OpenAI 模型名不在模板中写死。模型供应商会更新可用模型，�
   接口，不能在适配器里静默丢掉多余调用。
 - Thinking、`tool_choice` 和 strict mode 存在组合限制；我们会用契约测试固定实际支持范围。
 - Token 用量、结束原因和请求 ID 应进入运行轨迹，不能只保留最终文本。
+
+## 官方参考
+
+- [DeepSeek Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing/)
+- [DeepSeek Responses API](https://api-docs.deepseek.com/api/create-response/)
+- [DeepSeek Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode/)
+- [OpenAI Responses API](https://developers.openai.com/api/reference/responses/overview)
+- [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)

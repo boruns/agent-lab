@@ -7,10 +7,10 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 当前阶段 | 阶段 2：可靠工具系统 |
-| 当前课程 | [第 8 课：Tool Registry、命名空间与生命周期](02-tools/08-tool-registry.md) |
-| 已完成 | 环境、ReAct、安全工具、Schema、参数校验、结构化结果、重试与取消、副作用与权限 |
-| 下一课 | LLM 基本词汇与 Provider 阶段 |
+| 当前阶段 | 阶段 3：模型 Provider |
+| 当前课程 | [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) |
+| 已完成 | 环境、ReAct、可靠工具系统（含 Registry、命名空间与生命周期） |
+| 下一课 | 第 10 课：Provider Adapter |
 
 运行当前验收：
 
@@ -42,14 +42,16 @@ docs/
 │   └── desktop-ui.md             # Tauri + Vue Desktop 技术路线
 ├── 01-foundations/               # Agent 基础
 │   └── 01-minimal-react-agent.md
-└── 02-tools/                     # 工具与执行边界
-    ├── 02-safe-tool-execution.md
-    ├── 03-json-schema.md
-    ├── 04-argument-validation.md
-    ├── 05-tool-results.md
-    ├── 06-retries-timeouts-cancellation.md
-    ├── 07-side-effects-and-permissions.md
-    └── 08-tool-registry.md
+├── 02-tools/                     # 工具与执行边界
+│   ├── 02-safe-tool-execution.md
+│   ├── 03-json-schema.md
+│   ├── 04-argument-validation.md
+│   ├── 05-tool-results.md
+│   ├── 06-retries-timeouts-cancellation.md
+│   ├── 07-side-effects-and-permissions.md
+│   └── 08-tool-registry.md
+└── 03-providers/                 # 模型协议与 Provider 适配
+    └── 09-llm-foundations.md
 ```
 
 未来阶段只在真正开始时创建目录，避免出现大量空目录。
@@ -76,7 +78,11 @@ docs/
 - [第 5 课：结构化 ToolResult 与工具错误分类](02-tools/05-tool-results.md) — 已完成
 - [第 6 课：可重试错误、退避、超时与取消](02-tools/06-retries-timeouts-cancellation.md) — 已完成
 - [第 7 课：副作用、幂等键、确认与权限分级](02-tools/07-side-effects-and-permissions.md) — 已完成
-- [第 8 课：Tool Registry、命名空间与生命周期](02-tools/08-tool-registry.md) — 进行中
+- [第 8 课：Tool Registry、命名空间与生命周期](02-tools/08-tool-registry.md) — 已完成
+
+### 阶段 3：模型 Provider
+
+- [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) — 进行中
 
 ## 文档约定
 

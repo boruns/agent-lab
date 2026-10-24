@@ -163,11 +163,20 @@ class ToolRegistry:
         if self.state is ToolRegistryState.CLOSED:
             return
 
+        cleanup_errors: list[BaseException] = []
         if self.state is ToolRegistryState.STARTED:
-            for started_tool in reversed(self._started_tools):
-                started_tool.close()
+            while self._started_tools:
+                started_tool = self._started_tools.pop()
+                try:
+                    started_tool.close()
+                except BaseException as cleanup_error:  # noqa: BLE001
+                    cleanup_errors.append(cleanup_error)
 
-        # if self.state is ToolRegistryState.OPEN:
-
-        self._state = ToolRegistryState.CLOSED
         self._started_tools.clear()
+        self._state = ToolRegistryState.CLOSED
+
+        if cleanup_errors:
+            raise BaseExceptionGroup(
+                "One or more managed tools failed to close",
+                cleanup_errors,
+            )

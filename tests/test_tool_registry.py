@@ -21,10 +21,12 @@ class LifecycleTool(RecordingTool):
         events: list[str],
         *,
         fail_on_start: bool = False,
+        fail_on_close: bool = False,
     ) -> None:
         super().__init__(name, f"{name} result")
         self._events = events
         self._fail_on_start = fail_on_start
+        self._fail_on_close = fail_on_close
 
     def start(self) -> None:
         self._events.append(f"start:{self.name}")
@@ -33,6 +35,8 @@ class LifecycleTool(RecordingTool):
 
     def close(self) -> None:
         self._events.append(f"close:{self.name}")
+        if self._fail_on_close:
+            raise RuntimeError(f"failed to close {self.name}")
 
 
 class ToolRegistryTests(unittest.TestCase):
@@ -131,6 +135,40 @@ class ToolRegistryTests(unittest.TestCase):
             events,
         )
         self.assertEqual(ToolRegistryState.CLOSED, registry.state)
+
+    def test_close_reports_all_failures_without_repeating_tools(self) -> None:
+        events: list[str] = []
+        registry = ToolRegistry(
+            [
+                LifecycleTool("first", events, fail_on_close=True),
+                LifecycleTool("second", events, fail_on_close=True),
+                LifecycleTool("third", events),
+            ]
+        )
+        registry.start()
+
+        with self.assertRaises(ExceptionGroup) as raised:
+            registry.close()
+
+        self.assertEqual(
+            [
+                "start:first",
+                "start:second",
+                "start:third",
+                "close:third",
+                "close:second",
+                "close:first",
+            ],
+            events,
+        )
+        self.assertEqual(
+            ["failed to close second", "failed to close first"],
+            [str(error) for error in raised.exception.exceptions],
+        )
+        self.assertEqual(ToolRegistryState.CLOSED, registry.state)
+
+        registry.close()
+        self.assertEqual(6, len(events))
 
     def test_agent_rejects_duplicate_tools_during_setup(self) -> None:
         tools = [
