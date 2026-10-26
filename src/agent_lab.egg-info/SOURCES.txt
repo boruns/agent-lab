@@ -3,6 +3,8 @@ pyproject.toml
 src/agent_lab/__init__.py
 src/agent_lab/agent.py
 src/agent_lab/contracts.py
+src/agent_lab/providers.py
+src/agent_lab/registry.py
 src/agent_lab/testing.py
 src/agent_lab/tools.py
 src/agent_lab.egg-info/PKG-INFO
@@ -12,5 +14,10 @@ src/agent_lab.egg-info/requires.txt
 src/agent_lab.egg-info/top_level.txt
 tests/test_agent.py
 tests/test_calculator_tool.py
+tests/test_provider_adapter.py
+tests/test_tool_permissions.py
+tests/test_tool_registry.py
+tests/test_tool_result.py
+tests/test_tool_retries.py
 tests/test_tool_schema.py
 tests/test_tool_validation.py

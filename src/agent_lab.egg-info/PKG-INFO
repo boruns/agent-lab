@@ -4,3 +4,4 @@ Version: 0.1.0
 Summary: Build an AI agent from first principles
 Requires-Python: <3.13,>=3.12
 Requires-Dist: jsonschema>=4.26.0
+Requires-Dist: openai>=3.37.0

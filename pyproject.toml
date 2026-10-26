@@ -9,6 +9,7 @@ description = "Build an AI agent from first principles"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "jsonschema>=4.26.0",
+    "openai>=3.37.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -5,16 +5,16 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 
 ## 当前进度
 
-- 阶段 0：学习路线与工程约定（已完成）
-- 模型 Provider：DeepSeek 优先，OpenAI 备用（约定已完成，适配器待阶段 3 实现）
-- 阶段 1 / 第 1 课：最小 ReAct 循环（已完成）
-- 阶段 2 / 第 2 课：工具契约与安全执行（已完成）
-- 阶段 2 / 第 3 课：JSON Schema 工具参数契约（已完成）
-- 阶段 2 / 第 4 课：执行前参数校验（已完成）
-- 阶段 2 / 第 5 课：结构化 ToolResult 与工具错误分类（已完成）
-- 阶段 2 / 第 6 课：可重试错误、退避、超时与取消（已完成）
-- 阶段 2 / 第 7 课：副作用、幂等键、确认与权限分级（已完成）
-- 阶段 2 / 第 8 课：Tool Registry、命名空间与生命周期（进行中）
+| 项目 | 状态 |
+| --- | --- |
+| 当前阶段 | 阶段 3：模型 Provider |
+| 当前课程 | [第 11 课：DeepSeek 基础调用与 Transport 边界](docs/03-providers/11-deepseek-transport.md)（已完成） |
+| 已完成课程 | 第 1～11 课 |
+| 下一课 | 第 12 课：Function Calling |
+
+目前已经完成最小 ReAct 循环、可靠工具系统、Tool Registry、LLM 基础和 Provider Adapter。
+DeepSeek Transport 已接入显式配置、物理超时、稳定错误分类和 Token Usage 记录，同时保持 Agent
+核心与供应商 SDK 解耦。
 
 ## 为什么先用 Python
 
@@ -32,11 +32,12 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 ```bash
 uv sync
 uv run pytest
+uv run ruff check .
+uv run ruff format --check .
 ```
 
-当前新增的 Registry 测试会按设计失败：它们对应第 8 课——处理重复名称、命名空间、稳定工具
-快照和资源生命周期。阅读
-[`docs/02-tools/08-tool-registry.md`](docs/02-tools/08-tool-registry.md) 后完成它。
+第 11 课已经通过离线验收。真实 DeepSeek 冒烟测试仍为显式、可选步骤，默认测试不访问网络，
+也不需要 API Key。第 12 课尚未开始。
 
 完整课程已经按能力依赖重构为 13 个阶段。阶段顺序、验收项目和语言选择见
 [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)。当前只需关注正在进行的一课，
@@ -44,10 +45,12 @@ uv run pytest
 
 ## 文档
 
+- [`AGENTS.md`](AGENTS.md)：跨聊天窗口持续生效的项目协作与课程维护约定
 - [`docs/README.md`](docs/README.md)：文档中心、当前课程和分类目录
 - [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)：系统课程总纲与阶段验收
 - [`docs/00-overview/desktop-ui.md`](docs/00-overview/desktop-ui.md)：Desktop 技术选型与架构边界
-- [`docs/02-tools/08-tool-registry.md`](docs/02-tools/08-tool-registry.md)：当前课程
+- [`docs/03-providers/10-provider-adapter.md`](docs/03-providers/10-provider-adapter.md)：上一课与思考题答案
+- [`docs/03-providers/11-deepseek-transport.md`](docs/03-providers/11-deepseek-transport.md)：当前课程
 
 ## 参考资料
 

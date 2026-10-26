@@ -2,7 +2,7 @@
 
 > **文档类型**：课程地图  
 > **维护规则**：本文件是唯一的完整课程顺序  
-> **导航**：[文档中心](../README.md) · [学习方法](course-method.md) · [当前课程](../03-providers/10-provider-adapter.md)
+> **导航**：[文档中心](../README.md) · [学习方法](course-method.md) · [当前课程](../03-providers/11-deepseek-transport.md)
 
 ## 1. 学习目标
 
@@ -135,8 +135,8 @@ Agent 增加一种能力时，必须同时回答：谁可以触发它、如何�
 ### 阶段 3：模型 Provider 与 DeepSeek
 
 - [x] [第 9 课](../03-providers/09-llm-foundations.md)：LLM 基本词汇——Token、消息角色、上下文窗口、采样和结构化输出；
-- [>] [第 10 课](../03-providers/10-provider-adapter.md)：Provider Adapter——将项目消息翻译为供应商请求；
-- [ ] 第 11 课：DeepSeek 基础调用、配置、超时、错误映射和用量记录；
+- [x] [第 10 课](../03-providers/10-provider-adapter.md)：Provider Adapter——将项目消息翻译为供应商请求；
+- [x] [第 11 课](../03-providers/11-deepseek-transport.md)：DeepSeek 基础调用、配置、超时、错误映射和用量记录；
 - [ ] 第 12 课：Function Calling——工具 Schema、`tool_call_id` 和结果关联；
 - [ ] 第 13 课：一次返回多个工具调用时的顺序与并行策略；
 - [ ] 第 14 课：流式响应、取消、部分输出和连接中断；
@@ -363,9 +363,9 @@ Desktop 是已有 Agent 能力的控制面，不应该成为第二套 Agent 状�
 ## 10. 当前学习位置
 
 ```text
-已完成：环境、ReAct、可靠工具系统、LLM 基本词汇与 Provider 边界
-进行中：第 10 课——Provider Adapter 与协议映射
-下一课：第 11 课——DeepSeek 基础调用
+已完成：环境、ReAct、可靠工具系统、LLM 基本词汇、Provider Adapter、DeepSeek Transport
+进行中：无（第 11 课已完成）
+下一课：第 12 课——Function Calling（尚未开始）
 ```
 
 当前不需要预习多 Agent、向量数据库、Temporal 或 WASI。先把本地单 Agent 的每一条边界建立

@@ -1,10 +1,10 @@
 # 第 10 课：Provider Adapter 与协议映射
 
 > **阶段**：3 · 模型 Provider  
-> **状态**：进行中  
+> **状态**：已完成
 > **最后核验**：2026-10-26  
 > **前置**：第 9 课的 Token、消息、结束语义与结构化输出  
-> **导航**：[文档中心](../README.md) · [上一课](09-llm-foundations.md) · [课程总纲](../00-overview/curriculum.md)
+> **导航**：[文档中心](../README.md) · [上一课](09-llm-foundations.md) · [下一课](11-deepseek-transport.md) · [课程总纲](../00-overview/curriculum.md)
 
 ## 本课要解决的问题
 
@@ -261,3 +261,64 @@ OpenAI SDK 或发出网络请求。
 - [DeepSeek Harness Safety](https://github.com/deepseek-ai/deepseek-harness/blob/master/SAFETY.md)
 - [OpenAI Responses API](https://developers.openai.com/api/reference/responses/overview)
 - [OpenAI Function Calling](https://developers.openai.com/api/docs/guides/function-calling)
+
+## 12. 思考题参考答案
+
+### 1. Adapter 与 Transport 为什么要分开？
+
+Adapter 处理确定性的协议映射：项目消息如何变成 Provider JSON，Provider 输出如何变成
+项目决策。Transport 处理带副作用的 I/O：认证、超时、网络、SDK 和 HTTP 错误。两者的变化
+原因也不同：Provider 字段或项目协议变化会影响 Adapter，网络库、代理、重试和连接配置变化会
+影响 Transport。
+
+分开后可以获得三个直接收益：
+
+- Adapter 使用内存假对象即可做快速、确定性的映射测试；
+- Transport 可以单独验证超时和错误分类，不必构造完整 Agent 对话；
+- 更换 SDK 或 HTTP 实现时，不需要改动 Agent 的 `Message`、`Decision` 和控制循环。
+
+如果合在一个类里，纯映射测试也会依赖 Client 配置，网络异常与协议错误容易被混成同一类错误，
+职责和测试边界都会变得模糊。
+
+### 2. 工具名编码为什么必须可逆？
+
+响应中只会返回 Provider 看到的工具名。宿主必须把它稳定还原成 Registry 公开名称，才能查找
+正确工具、应用正确权限并记录可重放轨迹。删除或普通替换不支持字符会让不同公开名称映射到
+同一名称，形成路由和权限混淆。例如直接删除点号会让 `web.search` 与 `websearch` 都变成
+`websearch`。
+
+可逆编码还必须没有歧义。本课不仅把 `.` 编码为 `_d`，也先把原始 `_` 编码为 `_u`，因此
+`docs.search_v2` 可以被唯一还原。解码时遇到未知或不完整转义必须 fail closed，不能猜测模型
+原本指向哪个工具。
+
+### 3. 为什么不能把 tool 结果伪装成 user 消息？
+
+工具结果是对某个具体 call ID 的回复，user 消息则是新的用户输入。降级为 user 会丢失调用关联，
+改变模型对内容来源和指令优先级的理解，还会把不可信的工具输出伪装成用户意图。缺少 call ID
+时应 fail closed，而不是猜测语义。
+
+这不仅影响回答质量，也影响安全性和重放能力：模型可能把网页或命令输出中的提示注入文本当成
+用户要求；多个并发调用时无法判断结果属于哪次调用；审计轨迹也无法证明“调用—结果”配对。
+因此正确做法是等待第 12 课扩展消息契约，显式保存 assistant 的调用和对应 `tool_call_id`。
+
+### 4. 为什么 API 兼容仍需独立 Adapter？
+
+兼容通常只代表主要 JSON 形状接近。Provider 仍可能在状态保存、角色映射、推理字段、支持的
+item 类型、默认值、错误码、usage 和不支持参数的处理上不同。独立 Adapter 使这些差异显式且
+可以通过各自的契约测试固定。
+
+更准确地说，SDK 兼容可以帮助两个 Provider 共用部分 **Transport 机制**，却不能自动证明它们
+具有相同的 **协议语义**。即使请求都能成功，某个 Provider 也可能忽略字段、返回不同的结束原因，
+或使用不同的工具调用和推理内容结构。通过各自 Adapter 或各自契约测试把差异固定下来，比在
+核心代码里散布 Provider 条件分支更安全。
+
+### 5. 为什么先检查 status 和 item type？
+
+文本字段可能出现在被截断、拒绝、失败或同时包含工具调用的响应中。如果先找文本就返回，
+Agent 可能把部分输出当成最终答案，或静默丢掉需要执行的工具调用。先验证顶层状态和 item 类型，
+再按对应结构读取文本，才能保证结束语义和类型安全。
+
+解析顺序实际上是在验证一个逐层收窄的状态机：先确认响应整体已完成，再确认输出项确实是
+assistant message，然后确认 message 与 content part 的状态和类型，最后才读取 `output_text`。
+任何未知类型都应显式失败，留给后续课程增加支持；不能把“当前解析器不认识”误判为“模型已经
+给出最终答案”。

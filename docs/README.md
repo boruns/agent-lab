@@ -8,9 +8,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 当前阶段 | 阶段 3：模型 Provider |
-| 当前课程 | [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) |
-| 已完成 | 环境、ReAct、可靠工具系统、LLM 基本词汇 |
-| 下一课 | 第 11 课：DeepSeek 基础调用 |
+| 当前课程 | [第 11 课：DeepSeek 基础调用与 Transport 边界](03-providers/11-deepseek-transport.md)（已完成） |
+| 已完成 | 环境、ReAct、可靠工具系统、LLM 基本词汇、Provider Adapter、DeepSeek Transport |
+| 下一课 | 第 12 课：Function Calling |
 
 运行当前验收：
 
@@ -26,8 +26,8 @@ uv run ruff format --check .
 2. 阅读当前课程文档，理解“为什么需要这个功能”；
 3. 运行测试观察失败；
 4. 完成练习后再次运行测试；
-5. 让我进行代码审阅并回答思考题；
-6. 审阅通过后进入下一课。
+5. 让我进行代码审阅，确认实现和回归测试通过；
+6. 开始下一课时，先把本课思考题参考答案写回本课文档，再进入新课。
 
 ## 目录结构
 
@@ -52,7 +52,8 @@ docs/
 │   └── 08-tool-registry.md
 └── 03-providers/                 # 模型协议与 Provider 适配
     ├── 09-llm-foundations.md
-    └── 10-provider-adapter.md
+    ├── 10-provider-adapter.md
+    └── 11-deepseek-transport.md
 ```
 
 未来阶段只在真正开始时创建目录，避免出现大量空目录。
@@ -84,13 +85,16 @@ docs/
 ### 阶段 3：模型 Provider
 
 - [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) — 已完成
-- [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) — 进行中
+- [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) — 已完成
+- [第 11 课：DeepSeek 基础调用与 Transport 边界](03-providers/11-deepseek-transport.md) — 已完成
 
 ## 文档约定
 
 - `00-overview/` 只放全项目级约定，不放具体课程；
 - 阶段目录使用两位数字，课程文件名保留课号；
 - 每篇课程包含问题、作用、实现、验证、思考题；
-- 课程状态只在本页和系统总纲维护，避免多个进度表互相矛盾；
+- 系统总纲维护完整课序；根目录 `README.md` 与本页同步维护当前课程摘要；
+- 每次开始或验收一课时，同步检查根 `README.md`、本页、系统总纲中的状态与导航，以及相邻课程的上一课/下一课链接；
+- 开始下一课时，先将上一课所有思考题的参考答案补充到上一课文档；进行中的课程不提前公开答案；
 - 代码路径相对仓库根目录书写，文档链接使用相对路径；
 - 新概念首次出现时使用中文解释，并保留常见英文术语方便检索。
