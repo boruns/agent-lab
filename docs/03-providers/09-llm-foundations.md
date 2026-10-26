@@ -1,10 +1,10 @@
 # 第 9 课：LLM 基本词汇与 Provider 边界
 
 > **阶段**：3 · 模型 Provider  
-> **状态**：进行中  
+> **状态**：已完成
 > **最后核验**：2026-10-24  
 > **前置**：第 8 课的 Tool Registry 与生命周期  
-> **导航**：[文档中心](../README.md) · [上一课](../02-tools/08-tool-registry.md) · [课程总纲](../00-overview/curriculum.md)
+> **导航**：[文档中心](../README.md) · [上一课](../02-tools/08-tool-registry.md) · [下一课](10-provider-adapter.md) · [课程总纲](../00-overview/curriculum.md)
 
 ## 本课要解决的问题
 
@@ -175,3 +175,39 @@ JSON 合法不代表符合预期 Schema；符合 Schema 不代表业务事实正
 - [DeepSeek Responses API](https://api-docs.deepseek.com/api/create-response/)
 - [DeepSeek JSON Output](https://api-docs.deepseek.com/guides/json_mode/)
 - [DeepSeek Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode/)
+
+## 12. 思考题参考答案
+
+### 1. Token 预估误差为什么会影响 Agent 可靠性？
+
+普通聊天的估算偏差可能只造成回答变短或请求失败。Agent 则可能因为误判剩余容量，
+在关键工具结果返回后无法完成综合，或在历史截断时丢失用户约束、权限决定和已完成步骤。
+它还可能误算成本预算，在长任务中引起连锁重试。因此应在请求前保守预估并留出安全余量，
+请求后再以 Provider usage 校准轨迹和预算。
+
+### 2. 工具 Schema 为什么也消耗上下文？
+
+工具名、描述、参数 Schema 和其他调用指令都必须随请求提供给模型，模型才能决定
+是否调用及如何生成参数。它们虽然不是普通聊天文本，仍会被编码并占用模型输入容量。
+工具越多、描述和 Schema 越长，留给历史、证据和输出的空间就越少。这也是后续需要工具发现和
+渐进式披露的原因。
+
+### 3. Structured Outputs 为什么不能替代业务校验？
+
+Schema 只能约束形状和部分局部条件。它可以确保 `amount` 是数字，却不能证明金额来自最新账单、
+收款人是用户真正意图的对象，或当前账户拥有执行权限。Provider 还可能只支持 JSON Schema 的
+一个子集，并在拒绝或截断时不产生正常结构。所以本地仍要验证数据形状、业务规则、权限和时效性。
+
+### 4. Adapter 为什么不能只返回字符串？
+
+一个响应可能表示最终文本、工具调用、截断、拒绝或失败；还带有 call ID、finish reason、
+usage、request ID 和模型版本。只返回字符串会把这些控制流数据丢掉，让 Agent 无法判断
+应继续执行、重试、报错还是结束。Adapter 应返回项目自己的结构化响应，再由 Agent 根据显式类型
+控制流程。
+
+### 5. 为什么测试不应写死价格或别名的底层版本？
+
+价格、模型别名和能力组合是 Provider 可以独立更新的运营配置，并不需要项目发版。把它们
+写死在单元测试中，会让代码契约与外部可变事实耦合，既可能无故打破测试，也可能在文档已过时时
+继续显示绿灯。单元测试应固定项目的映射、校验和错误语义；当日价格与能力矩阵应在带日期的文档、
+配置或显式的在线契约检查中维护。

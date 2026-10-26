@@ -8,9 +8,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 当前阶段 | 阶段 3：模型 Provider |
-| 当前课程 | [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) |
-| 已完成 | 环境、ReAct、可靠工具系统（含 Registry、命名空间与生命周期） |
-| 下一课 | 第 10 课：Provider Adapter |
+| 当前课程 | [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) |
+| 已完成 | 环境、ReAct、可靠工具系统、LLM 基本词汇 |
+| 下一课 | 第 11 课：DeepSeek 基础调用 |
 
 运行当前验收：
 
@@ -51,7 +51,8 @@ docs/
 │   ├── 07-side-effects-and-permissions.md
 │   └── 08-tool-registry.md
 └── 03-providers/                 # 模型协议与 Provider 适配
-    └── 09-llm-foundations.md
+    ├── 09-llm-foundations.md
+    └── 10-provider-adapter.md
 ```
 
 未来阶段只在真正开始时创建目录，避免出现大量空目录。
@@ -82,7 +83,8 @@ docs/
 
 ### 阶段 3：模型 Provider
 
-- [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) — 进行中
+- [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) — 已完成
+- [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) — 进行中
 
 ## 文档约定
 
