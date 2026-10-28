@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
-from .contracts import Decision, FinalAnswer, Message, ToolDefinition
+from .contracts import Decision, FinalAnswer, Message, ToolCall, ToolDefinition
 
 _PUBLIC_TOOL_NAME_PATTERN = re.compile(
     r"[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)?\Z"
@@ -119,9 +120,56 @@ class DeepSeekResponsesAdapter:
     ) -> dict[str, Any]:
         """Build one non-streaming, non-thinking Responses API request."""
         input_items: list[dict[str, Any]] = []
+        pending_call: tuple[str, str] | None = None
+        seen_call_ids: set[str] = set()
+
         for message in messages:
+            # 证明发生了调用
+            if pending_call is not None:
+                pending_call_id, pending_name = pending_call
+                if message.role != "tool":
+                    raise ProviderMappingError(
+                        f"Function call ID {pending_call_id!r} must be immediately "
+                        "followed by its tool result"
+                    )
+                if message.call_id != pending_call_id:
+                    raise ProviderMappingError(
+                        f"Tool result call ID {message.call_id!r} does not match "
+                        f"pending call ID {pending_call_id!r}"
+                    )
+                if message.name != pending_name:
+                    raise ProviderMappingError(
+                        f"Tool result for call ID {pending_call_id!r} does not match "
+                        f"the pending tool name {pending_name!r}"
+                    )
+
+                input_items.append(self._build_function_call_output(message))
+                pending_call = None
+                continue
+
             if message.role == "tool":
-                raise ProviderMappingError("Tool message call ID is missing")
+                raise ProviderMappingError(
+                    f"Tool result call ID {message.call_id!r} has no pending "
+                    "function call"
+                )
+
+            # assistant 开始发起 function call
+            if message.role == "assistant" and (
+                message.call_id is not None
+                or message.name is not None
+                or message.arguments is not None
+            ):
+                # 构建 function call 结构体
+                input_items.append(self._build_function_call(message))
+                assert isinstance(message.call_id, str)
+                assert isinstance(message.name, str)
+                if message.call_id in seen_call_ids:
+                    raise ProviderMappingError(
+                        f"Duplicate function call ID {message.call_id!r}"
+                    )
+                seen_call_ids.add(message.call_id)
+                pending_call = (message.call_id, message.name)
+                continue
             if message.role not in ("user", "assistant"):
                 raise ProviderMappingError(
                     f"Unsupported project message role: {message.role!r}"
@@ -132,6 +180,13 @@ class DeepSeekResponsesAdapter:
                     "role": message.role,
                     "content": message.content,
                 }
+            )
+
+        # 走到这一步代表有没有调用的 function call,因为上一步有的话就会将 pending call 置空
+        if pending_call is not None:
+            pending_call_id, _ = pending_call
+            raise ProviderMappingError(
+                f"Function call ID {pending_call_id!r} has no matching tool result"
             )
 
         request: dict[str, Any] = {
@@ -152,6 +207,64 @@ class DeepSeekResponsesAdapter:
             ]
         return request
 
+    def _build_function_call(self, message: Message) -> dict[str, Any]:
+        if message.role != "assistant":
+            raise ProviderMappingError("Function call message role must be assistant")
+        if not isinstance(message.call_id, str) or not message.call_id.strip():
+            raise ProviderMappingError(
+                "Function call message call ID must not be empty"
+            )
+        if not isinstance(message.name, str) or not message.name.strip():
+            raise ProviderMappingError("Function call message name must not be empty")
+        if not isinstance(message.arguments, Mapping):
+            raise ProviderMappingError(
+                "Function call message arguments must be a mapping"
+            )
+        if message.content != "":
+            raise ProviderMappingError("Function call message content must be empty")
+
+        try:
+            arguments = json.dumps(
+                dict(message.arguments),
+                ensure_ascii=False,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        except (TypeError, ValueError) as error:
+            raise ProviderMappingError(
+                "Function call message arguments must be JSON serializable"
+            ) from error
+
+        return {
+            "type": "function_call",
+            "call_id": message.call_id,
+            "name": ProviderToolNameCodec.encode(message.name),
+            "arguments": arguments,
+        }
+
+    def _build_function_call_output(self, message: Message) -> dict[str, Any]:
+        if message.role != "tool":
+            raise ProviderMappingError("Function call output role must be tool")
+        if not isinstance(message.call_id, str) or not message.call_id.strip():
+            raise ProviderMappingError("Function call output call ID must not be empty")
+        if not isinstance(message.name, str) or not message.name.strip():
+            raise ProviderMappingError("Function call output name must not be empty")
+        if message.arguments is not None:
+            raise ProviderMappingError("Function call output arguments must be empty")
+        if not isinstance(message.content, str):
+            raise ProviderMappingError("Function call output must be text")
+
+        # 这一步主要做校验
+        # The Provider output item does not carry the name, but validating it here
+        # prevents an invalid local Registry name from entering replay history.
+        ProviderToolNameCodec.encode(message.name)
+
+        return {
+            "type": "function_call_output",
+            "call_id": message.call_id,
+            "output": message.content,
+        }
+
     def parse_response(self, response: Mapping[str, Any]) -> Decision:
         """Parse the lesson-10 subset: one completed text response."""
         status = response.get("status")
@@ -164,18 +277,21 @@ class DeepSeekResponsesAdapter:
         if not isinstance(output, list):
             raise UnsupportedProviderResponseError("Response output must be a list")
 
-        for item in output:
-            if isinstance(item, Mapping) and item.get("type") == "function_call":
-                raise UnsupportedProviderResponseError(
-                    "Function calls will be supported in lesson 12"
-                )
-
         if len(output) != 1:
+            if any(
+                isinstance(item, Mapping) and item.get("type") == "function_call"
+                for item in output
+            ):
+                raise UnsupportedProviderResponseError(
+                    "Multiple function calls will be supported in lesson 13"
+                )
             raise UnsupportedProviderResponseError(
                 "Response output must contain exactly one message"
             )
 
         message = output[0]
+        if isinstance(message, Mapping) and message.get("type") == "function_call":
+            return self._parse_function_call(message)
         if not isinstance(message, Mapping) or message.get("type") != "message":
             raise UnsupportedProviderResponseError(
                 "Response output item must be a message"
@@ -217,3 +333,48 @@ class DeepSeekResponsesAdapter:
                 "Response message contains no output text"
             )
         return FinalAnswer("".join(output_texts))
+
+    def _parse_function_call(self, item: Mapping[str, Any]) -> ToolCall:
+        status = item.get("status")
+        if status != "completed":
+            raise UnsupportedProviderResponseError(
+                f"Response status is {status!r}, not a completed function call"
+            )
+        call_id = item.get("call_id")
+        provider_name = item.get("name")
+        if not isinstance(call_id, str) or not call_id.strip():
+            raise UnsupportedProviderResponseError(
+                "Function call call_id must be a non-empty string"
+            )
+        if not isinstance(provider_name, str) or not provider_name.strip():
+            raise UnsupportedProviderResponseError(
+                "Function call name must be a non-empty string"
+            )
+        try:
+            public_name = ProviderToolNameCodec.decode(provider_name)
+        except ProviderMappingError as error:
+            raise UnsupportedProviderResponseError(
+                "Function call contains an invalid Provider tool name"
+            ) from error
+
+        arguments = item.get("arguments")
+        if not isinstance(arguments, str) or not arguments.strip():
+            raise UnsupportedProviderResponseError(
+                "Function call arguments must be a non-empty JSON string"
+            )
+        try:
+            parsed_arguments = json.loads(arguments)
+        except json.JSONDecodeError as error:
+            raise UnsupportedProviderResponseError(
+                "Function call arguments must contain valid JSON"
+            ) from error
+        if not isinstance(parsed_arguments, dict):
+            raise UnsupportedProviderResponseError(
+                "Function call arguments must decode to a JSON object"
+            )
+
+        return ToolCall(
+            name=public_name,
+            arguments=parsed_arguments,
+            call_id=call_id,
+        )

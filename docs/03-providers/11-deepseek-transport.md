@@ -4,7 +4,7 @@
 > **前置课程**：[第 10 课：Provider Adapter 与协议映射](10-provider-adapter.md)
 > **本课范围**：真实 SDK 的创建与单次同步调用；暂不实现 Function Calling、重试或流式响应
 > **资料核对日期**：2026-10-26
-> **导航**：[课程总纲](../00-overview/curriculum.md) · [文档中心](../README.md) · 下一课：Function Calling
+> **导航**：[课程总纲](../00-overview/curriculum.md) · [文档中心](../README.md) · [下一课](12-function-calling.md)
 
 ## 1. 这节课解决什么问题
 
@@ -137,7 +137,7 @@ Harness（执行支架）是包住模型的工程系统：它装配上下文与�
 uv run pytest tests/test_deepseek_transport.py
 ```
 
-测试现在应因三个预留的 `NotImplementedError` 失败。**只修改
+首次开始本课时，测试会因三个预留的 `NotImplementedError` 失败。练习要求：**只修改
 `src/agent_lab/deepseek.py`，不要修改测试。**
 
 ## 9. 你的实现任务
@@ -235,4 +235,43 @@ uv run --env-file .env python scripts/deepseek_smoke.py
 - [DeepSeek：Rate Limit](https://api-docs.deepseek.com/quick_start/rate_limit/)
 - [OpenAI Python SDK：Retries and Timeouts](https://github.com/openai/openai-python#retries)
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+
+## 13. 思考题参考答案
+
+### 1. 为什么 `max_retries=0` 不等于系统永远不应该重试？
+
+`max_retries=0` 只是关闭 SDK 内部不可见的自动重试，把重试所有权交还给 Harness。上层仍可根据
+错误分类、剩余截止时间、调用预算和幂等性决定是否重试。这样每一次物理请求都会被计数和记录，
+不会出现 Agent 以为调用一次、SDK 实际调用多次的情况。
+
+### 2. 为什么 Agent 总超时不能替代 HTTP Client 的物理超时？
+
+当前 Agent 总超时是协作式的，只能在模型或工具调用返回后检查截止时间。如果网络连接一直阻塞，
+控制权没有回到 Agent，它就无法及时检查。HTTP Client 超时直接约束连接、读取和整个请求，负责
+让阻塞操作有界；Agent 总超时则约束跨多个模型与工具步骤的整体任务，两者作用层级不同。
+
+### 3. 为什么 429 可重试，而 401 和 402 通常不可重试？
+
+429 表示当前速率或并发容量不足，等待服务端建议的时间或退避后，外部条件可能恢复。401 通常
+意味着凭据缺失或无效，402 表示余额不足；不改变 Key、权限或账户余额就重复相同请求，只会再次
+失败并浪费预算。因此前者可以标记为暂时性错误，后两者应尽快暴露给操作者处理。
+
+### 4. 为什么 Usage 结构错误不能全部记为 0？
+
+0 是一个真实业务值，不是“未知”的同义词。把缺失或错误的 Usage 记成 0，会低估成本、绕过
+Token 预算、污染缓存命中率和模型对比数据，还让账单与本地轨迹无法核对。协议不满足预期时应
+明确失败或记录为独立的未知状态；本课选择不可重试的 `PROTOCOL` 错误来 fail closed。
+
+### 5. 为什么 Transport 返回普通映射，而不继续传 SDK Response？
+
+普通映射把 SDK 类型限制在 Transport 边界，使 Adapter 能用内存数据做确定性测试，也避免核心
+代码依赖 SDK 的 Pydantic 模型、懒加载属性和版本变化。它还便于序列化、记录和重放。代价是
+Transport 必须显式验证并保留项目真正需要的字段，而不能依赖 SDK 对象帮忙隐藏协议差异。
+
+### 6. 如果记录回调失败，已经产生的费用和调用结果怎么办？
+
+模型请求已经在外部完成，费用不能因本地记录失败而回滚，也不能盲目重新调用模型，否则可能
+重复计费并得到不同结果。本课让回调异常原样暴露，提醒调用者结果没有被可靠记录。生产实现应
+把“模型结果”和“遥测持久化状态”分开，保留 response ID 与原始结果，单独重试记录或写入
+outbox；是否仍把业务结果交给上层，需要由明确的可靠性策略决定。
 

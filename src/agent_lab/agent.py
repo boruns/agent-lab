@@ -110,11 +110,13 @@ class Agent:
 
         history: list[Message] = [Message(role="user", content=question)]
 
+        # agent 最多循环次数
         for step in range(self._max_steps):
             self._raise_if_stopped(deadline, cancellation_token)
             decision = self._model.decide(history, self._tool_registry.definitions())
             self._raise_if_stopped(deadline, cancellation_token)
 
+            # 如果已经完成了任务，直接返回
             if isinstance(decision, FinalAnswer):
                 history.append(Message(role="assistant", content=decision.content))
                 return RunResult(
@@ -122,6 +124,7 @@ class Agent:
                     steps=step + 1,
                     messages=tuple(history),
                 )
+            # 如果需要调用 Tool ，则开始执行 ToolCall
             if isinstance(decision, ToolCall):
                 registerd = self._tool_registry.resolve(decision.name)
                 if registerd is None:
@@ -170,15 +173,52 @@ class Agent:
                         idempotency_key,
                     )
 
-                history.append(
-                    Message(
-                        role="tool",
-                        content=_format_tool_result(tool_result),
-                        name=registerd.public_name,
+                # 如果调用 Tool 的时候 call_id 为空，有可能是工具调用失败或者参数校验失败
+                if decision.call_id is None:
+                    history.append(
+                        Message(
+                            role="tool",
+                            content=_format_tool_result(tool_result),
+                            name=registerd.public_name,
+                        )
                     )
-                )
+                else:
+                    self._append_function_call_exchange(
+                        history,
+                        decision,
+                        registerd.public_name,
+                        tool_result,
+                    )
 
         raise StepLimitExceeded("Step limit exceeded")
+
+    def _append_function_call_exchange(
+        self,
+        history: list[Message],
+        decision: ToolCall,
+        public_name: str,
+        result: ToolResult,
+    ) -> None:
+        if not isinstance(decision.call_id, str) or not decision.call_id.strip():
+            raise UnknownToolError(f"Tool {decision.name} call id must be not empty")
+
+        history.append(
+            Message(
+                role="assistant",
+                content="",
+                name=public_name,
+                call_id=decision.call_id,
+                arguments=dict(decision.arguments),
+            )
+        )
+        history.append(
+            Message(
+                role="tool",
+                content=_format_tool_result(result),
+                name=public_name,
+                call_id=decision.call_id,
+            )
+        )
 
     def _run_tool_with_retries(
         self,

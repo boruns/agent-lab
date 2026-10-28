@@ -8,9 +8,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 当前阶段 | 阶段 3：模型 Provider |
-| 当前课程 | [第 11 课：DeepSeek 基础调用与 Transport 边界](03-providers/11-deepseek-transport.md)（已完成） |
+| 当前课程 | [第 12 课：Function Calling 与调用关联](03-providers/12-function-calling.md) |
 | 已完成 | 环境、ReAct、可靠工具系统、LLM 基本词汇、Provider Adapter、DeepSeek Transport |
-| 下一课 | 第 12 课：Function Calling |
+| 下一课 | 第 13 课：多个工具调用的顺序与并行策略 |
 
 运行当前验收：
 
@@ -53,7 +53,8 @@ docs/
 └── 03-providers/                 # 模型协议与 Provider 适配
     ├── 09-llm-foundations.md
     ├── 10-provider-adapter.md
-    └── 11-deepseek-transport.md
+    ├── 11-deepseek-transport.md
+    └── 12-function-calling.md
 ```
 
 未来阶段只在真正开始时创建目录，避免出现大量空目录。
@@ -87,6 +88,7 @@ docs/
 - [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) — 已完成
 - [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) — 已完成
 - [第 11 课：DeepSeek 基础调用与 Transport 边界](03-providers/11-deepseek-transport.md) — 已完成
+- [第 12 课：Function Calling 与调用关联](03-providers/12-function-calling.md) — 进行中
 
 ## 文档约定
 
@@ -98,3 +100,4 @@ docs/
 - 开始下一课时，先将上一课所有思考题的参考答案补充到上一课文档；进行中的课程不提前公开答案；
 - 代码路径相对仓库根目录书写，文档链接使用相对路径；
 - 新概念首次出现时使用中文解释，并保留常见英文术语方便检索。
+- 协议字段必须明确写出字段名、固定值和类型；多个字段使用表格或完整示例，不使用斜杠简写。

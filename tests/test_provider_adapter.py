@@ -190,27 +190,6 @@ class DeepSeekResponsesAdapterTests(unittest.TestCase):
                 }
             )
 
-    def test_function_call_is_not_silently_discarded(self) -> None:
-        adapter = DeepSeekResponsesAdapter(
-            "deepseek-flash",
-            RecordingTransport({}),
-        )
-
-        with self.assertRaisesRegex(UnsupportedProviderResponseError, "lesson 12"):
-            adapter.parse_response(
-                {
-                    "status": "completed",
-                    "output": [
-                        {
-                            "type": "function_call",
-                            "call_id": "call_123",
-                            "name": "web_dsearch",
-                            "arguments": '{"query":"agents"}',
-                        }
-                    ],
-                }
-            )
-
 
 if __name__ == "__main__":
     unittest.main()

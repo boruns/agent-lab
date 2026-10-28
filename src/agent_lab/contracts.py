@@ -128,12 +128,15 @@ class Message:
     role: Role
     content: str
     name: str | None = None
+    call_id: str | None = None
+    arguments: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
 class ToolCall:
     name: str
     arguments: Mapping[str, Any]
+    call_id: str | None = None
 
 
 @dataclass(frozen=True)
