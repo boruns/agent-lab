@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from types import TracebackType
 from typing import Self
 from uuid import uuid4
@@ -19,15 +21,26 @@ from .contracts import (
     RunResult,
     Tool,
     ToolCall,
+    ToolCallBatch,
     ToolConfirmationRequest,
     ToolErrorKind,
     ToolExecutionContext,
     ToolPermission,
     ToolResult,
 )
-from .registry import ToolRegistry, ToolSource
+from .registry import RegisteredTool, ToolRegistry, ToolSource
 
 type Deadline = float | None
+
+
+@dataclass
+class _PreparedToolCall:
+    """Host-owned state prepared before any call in a batch executes."""
+
+    call: ToolCall
+    registered: RegisteredTool
+    result: ToolResult | None = None
+    idempotency_key: str | None = None
 
 
 class UnknownToolError(LookupError):
@@ -79,9 +92,13 @@ class Agent:
         allowed_permissions: Iterable[ToolPermission] = (ToolPermission.READ,),
         confirmation_handler: Callable[[ToolConfirmationRequest], bool] | None = None,
         idempotency_key_factory: Callable[[], str] = lambda: uuid4().hex,
+        parallel_tool_calls: bool = False,
+        max_parallel_tools: int = 4,
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
+        if max_parallel_tools < 1:
+            raise ValueError("max_parallel_tools must be at least 1")
 
         self._tool_registry = ToolRegistry(tools=tools)
         self._tool_registry.start()
@@ -93,6 +110,8 @@ class Agent:
         self._allowed_permissions = frozenset(allowed_permissions)
         self._confirmation_handler = confirmation_handler
         self._idempotency_key_factory = idempotency_key_factory
+        self._parallel_tool_calls = parallel_tool_calls
+        self._max_parallel_tools = max_parallel_tools
 
     def run(
         self,
@@ -124,6 +143,14 @@ class Agent:
                     steps=step + 1,
                     messages=tuple(history),
                 )
+            if isinstance(decision, ToolCallBatch):
+                self._execute_tool_call_batch(
+                    history,
+                    decision,
+                    deadline,
+                    cancellation_token,
+                )
+                continue
             # 如果需要调用 Tool ，则开始执行 ToolCall
             if isinstance(decision, ToolCall):
                 registerd = self._tool_registry.resolve(decision.name)
@@ -191,6 +218,178 @@ class Agent:
                     )
 
         raise StepLimitExceeded("Step limit exceeded")
+
+    def _execute_tool_call_batch(
+        self,
+        history: list[Message],
+        decision: ToolCallBatch,
+        deadline: Deadline,
+        cancellation_token: CancellationToken | None,
+    ) -> None:
+        """Preflight, execute, and record one ordered tool-call batch."""
+        self._raise_if_stopped(deadline, cancellation_token)
+
+        seen_call_ids: set[str] = set()
+        for call in decision.calls:
+            self._raise_if_stopped(deadline, cancellation_token)
+            call_id = call.call_id
+            if not isinstance(call_id, str) or not call_id.strip():
+                raise ValueError("Tool call ID must be a non-empty string")
+            if call_id in seen_call_ids:
+                raise ValueError(f"Duplicate tool call ID {call_id!r}")
+            seen_call_ids.add(call_id)
+
+        prepared_calls: list[_PreparedToolCall] = []
+        for call in decision.calls:
+            self._raise_if_stopped(deadline, cancellation_token)
+            registered = self._tool_registry.resolve(call.name)
+            if registered is None:
+                raise UnknownToolError(f"Model requested unknown tool: {call.name}")
+            prepared_calls.append(_PreparedToolCall(call, registered))
+
+        for prepared in prepared_calls:
+            self._raise_if_stopped(deadline, cancellation_token)
+            registered = prepared.registered
+            if registered.tool.permission not in self._allowed_permissions:
+                raise ToolPermissionDeniedError(
+                    f"Tool: {registered.public_name} "
+                    f"{registered.tool.permission} permission not allow"
+                )
+
+        for prepared in prepared_calls:
+            self._raise_if_stopped(deadline, cancellation_token)
+            try:
+                prepared.registered.validator.validate(dict(prepared.call.arguments))
+            except ValidationError as error:
+                prepared.result = ToolResult.failure(
+                    ToolErrorKind.INVALID_ARGUMENTS,
+                    error.message,
+                )
+
+        for prepared in prepared_calls:
+            self._raise_if_stopped(deadline, cancellation_token)
+            registered = prepared.registered
+            if (
+                prepared.result is not None
+                or registered.tool.permission is not ToolPermission.WRITE
+            ):
+                continue
+            if self._confirmation_handler is None:
+                raise ToolConfirmationRequiredError(
+                    f"Tool: {registered.public_name} permission is write, "
+                    "confirmation handler is none"
+                )
+
+            prepared.idempotency_key = self._idempotency_key_factory()
+            if not self._confirmation_handler(
+                ToolConfirmationRequest(
+                    registered.public_name,
+                    dict(prepared.call.arguments),
+                    prepared.idempotency_key,
+                )
+            ):
+                raise ToolConfirmationRejectedError(
+                    f"Tool: {registered.public_name} confirmation handler rejected"
+                )
+
+        self._raise_if_stopped(deadline, cancellation_token)
+        should_run_in_parallel = self._parallel_tool_calls and all(
+            prepared.registered.tool.permission is ToolPermission.READ
+            for prepared in prepared_calls
+        )
+        if should_run_in_parallel:
+            self._execute_prepared_calls_in_parallel(
+                prepared_calls,
+                deadline,
+                cancellation_token,
+            )
+        else:
+            self._execute_prepared_calls_sequentially(
+                prepared_calls,
+                deadline,
+                cancellation_token,
+            )
+
+        self._raise_if_stopped(deadline, cancellation_token)
+        for prepared in prepared_calls:
+            call = prepared.call
+            assert isinstance(call.call_id, str)
+            history.append(
+                Message(
+                    role="assistant",
+                    content="",
+                    name=prepared.registered.public_name,
+                    call_id=call.call_id,
+                    arguments=dict(call.arguments),
+                )
+            )
+
+        for prepared in prepared_calls:
+            call = prepared.call
+            result = prepared.result
+            assert isinstance(call.call_id, str)
+            assert result is not None
+            history.append(
+                Message(
+                    role="tool",
+                    content=_format_tool_result(result),
+                    name=prepared.registered.public_name,
+                    call_id=call.call_id,
+                )
+            )
+
+    def _execute_prepared_calls_sequentially(
+        self,
+        prepared_calls: list[_PreparedToolCall],
+        deadline: Deadline,
+        cancellation_token: CancellationToken | None,
+    ) -> None:
+        for prepared in prepared_calls:
+            self._raise_if_stopped(deadline, cancellation_token)
+            if prepared.result is not None:
+                continue
+            prepared.result = self._run_tool_with_retries(
+                prepared.registered.tool,
+                prepared.call.arguments,
+                deadline,
+                cancellation_token,
+                prepared.idempotency_key,
+            )
+
+    def _execute_prepared_calls_in_parallel(
+        self,
+        prepared_calls: list[_PreparedToolCall],
+        deadline: Deadline,
+        cancellation_token: CancellationToken | None,
+    ) -> None:
+        pending_calls = [
+            prepared for prepared in prepared_calls if prepared.result is None
+        ]
+        if not pending_calls:
+            return
+
+        max_workers = min(self._max_parallel_tools, len(pending_calls))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            for prepared in pending_calls:
+                self._raise_if_stopped(deadline, cancellation_token)
+                futures.append(
+                    (
+                        prepared,
+                        executor.submit(
+                            self._run_tool_with_retries,
+                            prepared.registered.tool,
+                            prepared.call.arguments,
+                            deadline,
+                            cancellation_token,
+                            prepared.idempotency_key,
+                        ),
+                    )
+                )
+
+            for prepared, future in futures:
+                prepared.result = future.result()
+                self._raise_if_stopped(deadline, cancellation_token)
 
     def _append_function_call_exchange(
         self,

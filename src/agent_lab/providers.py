@@ -5,9 +5,17 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping, Sequence
+from itertools import pairwise
 from typing import Any, Protocol
 
-from .contracts import Decision, FinalAnswer, Message, ToolCall, ToolDefinition
+from .contracts import (
+    Decision,
+    FinalAnswer,
+    Message,
+    ToolCall,
+    ToolCallBatch,
+    ToolDefinition,
+)
 
 _PUBLIC_TOOL_NAME_PATTERN = re.compile(
     r"[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)?\Z"
@@ -119,6 +127,10 @@ class DeepSeekResponsesAdapter:
         tools: Sequence[ToolDefinition],
     ) -> dict[str, Any]:
         """Build one non-streaming, non-thinking Responses API request."""
+        if self._contains_function_call_batch(messages):
+            input_items = self._build_batched_function_call_history(messages)
+            return self._build_request_from_input_items(input_items, tools)
+
         input_items: list[dict[str, Any]] = []
         pending_call: tuple[str, str] | None = None
         seen_call_ids: set[str] = set()
@@ -189,6 +201,13 @@ class DeepSeekResponsesAdapter:
                 f"Function call ID {pending_call_id!r} has no matching tool result"
             )
 
+        return self._build_request_from_input_items(input_items, tools)
+
+    def _build_request_from_input_items(
+        self,
+        input_items: list[dict[str, Any]],
+        tools: Sequence[ToolDefinition],
+    ) -> dict[str, Any]:
         request: dict[str, Any] = {
             "model": self._model,
             "input": input_items,
@@ -206,6 +225,104 @@ class DeepSeekResponsesAdapter:
                 for tool in tools
             ]
         return request
+
+    @staticmethod
+    def _is_function_call_message(message: Message) -> bool:
+        return message.role == "assistant" and (
+            message.call_id is not None
+            or message.name is not None
+            or message.arguments is not None
+        )
+
+    @classmethod
+    def _contains_function_call_batch(cls, messages: Sequence[Message]) -> bool:
+        return any(
+            cls._is_function_call_message(first)
+            and cls._is_function_call_message(second)
+            for first, second in pairwise(messages)
+        )
+
+    def _build_batched_function_call_history(
+        self,
+        messages: Sequence[Message],
+    ) -> list[dict[str, Any]]:
+        """Serialize call blocks followed by their ordered result blocks."""
+        items: list[dict[str, Any]] = []
+        seen_call_ids: set[str] = set()
+        message_index = 0
+
+        while message_index < len(messages):
+            message = messages[message_index]
+
+            if self._is_function_call_message(message):
+                call_block: list[Message] = []
+                while message_index < len(messages):
+                    call_message = messages[message_index]
+                    if not self._is_function_call_message(call_message):
+                        break
+
+                    function_call = self._build_function_call(call_message)
+                    assert isinstance(call_message.call_id, str)
+                    if call_message.call_id in seen_call_ids:
+                        raise ProviderMappingError(
+                            f"Duplicate function call ID {call_message.call_id!r}"
+                        )
+
+                    seen_call_ids.add(call_message.call_id)
+                    call_block.append(call_message)
+                    items.append(function_call)
+                    message_index += 1
+
+                for call_message in call_block:
+                    assert isinstance(call_message.call_id, str)
+                    assert isinstance(call_message.name, str)
+                    if message_index >= len(messages):
+                        raise ProviderMappingError(
+                            f"Function call ID {call_message.call_id!r} has no "
+                            "matching tool result"
+                        )
+
+                    result_message = messages[message_index]
+                    if result_message.role != "tool":
+                        raise ProviderMappingError(
+                            f"Function call ID {call_message.call_id!r} must be "
+                            "followed by its ordered tool result"
+                        )
+                    if result_message.call_id != call_message.call_id:
+                        raise ProviderMappingError(
+                            f"Tool result call ID {result_message.call_id!r} does "
+                            f"not match pending call ID {call_message.call_id!r}"
+                        )
+                    if result_message.name != call_message.name:
+                        raise ProviderMappingError(
+                            f"Tool result for call ID {call_message.call_id!r} does "
+                            f"not match the pending tool name {call_message.name!r}"
+                        )
+
+                    items.append(self._build_function_call_output(result_message))
+                    message_index += 1
+                continue
+
+            if message.role == "tool":
+                raise ProviderMappingError(
+                    f"Tool result call ID {message.call_id!r} has no pending "
+                    "function call"
+                )
+            if message.role not in ("user", "assistant"):
+                raise ProviderMappingError(
+                    f"Unsupported project message role: {message.role!r}"
+                )
+
+            items.append(
+                {
+                    "type": "message",
+                    "role": message.role,
+                    "content": message.content,
+                }
+            )
+            message_index += 1
+
+        return items
 
     def _build_function_call(self, message: Message) -> dict[str, Any]:
         if message.role != "assistant":
@@ -277,19 +394,23 @@ class DeepSeekResponsesAdapter:
         if not isinstance(output, list):
             raise UnsupportedProviderResponseError("Response output must be a list")
 
-        if len(output) != 1:
-            if any(
+        if len(output) > 1:
+            # 当前只支持所有 items status 为 completed ，且 type 为 function call
+            if all(
                 isinstance(item, Mapping) and item.get("type") == "function_call"
                 for item in output
             ):
-                raise UnsupportedProviderResponseError(
-                    "Multiple function calls will be supported in lesson 13"
-                )
+                return self._parse_function_call_batch(output)
             raise UnsupportedProviderResponseError(
-                "Response output must contain exactly one message"
+                "Response output contains mixed or unsupported item types"
+            )
+        if not output:
+            raise UnsupportedProviderResponseError(
+                "Response output must contain at least one item"
             )
 
         message = output[0]
+        # 如果只有一个回答，就是 function call  就直接调用 tool
         if isinstance(message, Mapping) and message.get("type") == "function_call":
             return self._parse_function_call(message)
         if not isinstance(message, Mapping) or message.get("type") != "message":
@@ -378,3 +499,23 @@ class DeepSeekResponsesAdapter:
             arguments=parsed_arguments,
             call_id=call_id,
         )
+
+    def _parse_function_call_batch(
+        self,
+        items: Sequence[Mapping[str, Any]],
+    ) -> ToolCallBatch:
+        """Parse one model turn containing multiple function calls."""
+        seen_call_ids: set[str] = set()
+        calls: list[ToolCall] = []
+        for item in items:
+            call = self._parse_function_call(item)
+            assert isinstance(call.call_id, str)
+            call_id = call.call_id
+            if call_id in seen_call_ids:
+                raise UnsupportedProviderResponseError(
+                    f"Duplicate function call ID {call_id!r}"
+                )
+            seen_call_ids.add(call_id)
+            calls.append(call)
+
+        return ToolCallBatch(calls=tuple(calls))

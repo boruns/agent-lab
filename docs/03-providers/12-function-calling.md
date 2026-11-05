@@ -1,11 +1,11 @@
 # 第 12 课：Function Calling 与调用关联
 
-> **状态**：进行中
+> **状态**：已完成
 > **前置课程**：[第 11 课：DeepSeek Transport](11-deepseek-transport.md)
 > **本课范围**：一次响应中的一个 Function Call，以及它与一个 Tool Result 的完整关联
 > **非目标**：多个并行调用、流式参数、内置工具、Thinking 模式和 strict beta
 > **资料核对日期**：2026-10-26
-> **导航**：[课程总纲](../00-overview/curriculum.md) · [文档中心](../README.md) · [上一课](11-deepseek-transport.md) · 下一课：多个工具调用
+> **导航**：[课程总纲](../00-overview/curriculum.md) · [文档中心](../README.md) · [上一课](11-deepseek-transport.md) · [下一课](13-parallel-tool-calls.md)
 
 ## 1. 本课解决的问题
 
@@ -279,4 +279,45 @@ uv run ruff format --check .
 - [DeepSeek Responses API Guide](https://api-docs.deepseek.com/guides/responses_api/)
 - [DeepSeek Tool Calls Guide](https://api-docs.deepseek.com/guides/tool_calls/)
 - [OpenAI Function Calling Guide](https://developers.openai.com/api/docs/guides/function-calling)
+
+## 11. 思考题参考答案
+
+### 1. 为什么工具名称和执行顺序都不能替代 `call_id`？
+
+同一个工具可以在一轮中被调用多次，名称不能区分这些调用；执行顺序也可能因并发、重试或结果
+完成顺序而改变。`call_id` 由 Provider 为一次具体调用生成，是调用请求与结果之间稳定且不依赖
+调度方式的关联键。名称负责路由到哪个工具，`call_id` 负责标识哪一次调用，职责不同。
+
+### 2. 为什么 JSON 解析成功后仍必须做 JSON Schema 校验？
+
+JSON 解析只证明文本语法合法。例如 `{"city": 42}` 是合法 JSON 对象，但如果 Schema 要求
+`city` 是字符串，它仍不是合法工具参数；对象还可能缺少必填字段或包含禁止的额外字段。因此
+Adapter 负责把 Provider 字符串还原为普通数据，Agent 再用 Registry 持有的 Schema 在执行前
+验证业务形状。
+
+### 3. 为什么历史中必须同时保存 assistant 的调用和 tool 的结果？
+
+工具结果不是一条独立用户消息，而是对模型先前某次调用提议的回答。重放无状态 Provider 历史
+时，`function_call` 说明模型请求了什么，`function_call_output` 说明外部环境返回了什么，两者通过
+同一 `call_id` 配对。只保留结果会丢失调用来源、参数和关联上下文，也不符合 Provider 协议。
+
+### 4. 为什么工具执行失败也应该返回关联到原调用的 `function_call_output`？
+
+参数错误、外部服务离线等预期失败仍然是那次调用的真实结果。把结构化错误作为同一 `call_id` 的
+输出交还模型，模型才能决定修正参数、选择其他工具或向用户解释失败。如果直接丢弃，历史会留下
+未闭合调用；如果伪造新调用，则会破坏因果关系。
+
+### 5. 为什么 Adapter 不应该直接查询 Tool Registry？
+
+Adapter 的职责是 Provider 协议与项目协议之间的可逆映射；Registry 属于 Agent/Harness，负责本地
+工具发现、Schema、权限和生命周期。让 Adapter 查询 Registry 会把 Provider 边界与执行环境耦合，
+使离线映射测试、Provider 替换和同一 Adapter 在不同工具集合中复用都更困难。参数的 JSON 语法
+由 Adapter 检查，工具是否存在及参数是否满足 Schema 由 Agent 检查。
+
+### 6. DeepSeek 始终可能并行调用工具时，本课为什么明确拒绝而不是只执行第一项？
+
+只执行第一项会静默丢弃模型已经提出的其他动作，随后历史和 Provider 看到的原始响应不一致，
+还可能让模型错误地认为整批任务已经完成。多个调用需要先定义批次边界、唯一 ID、顺序或并发
+策略、权限预检、部分失败以及稳定的结果回传顺序。本课在这些语义尚未建立时 fail closed，第
+13 课再把它们作为一个完整能力实现。
 

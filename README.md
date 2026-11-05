@@ -8,13 +8,13 @@ LangChain、LangGraph、CrewAI 等 Agent 框架；每个能力先理解问题和
 | 项目 | 状态 |
 | --- | --- |
 | 当前阶段 | 阶段 3：模型 Provider |
-| 当前课程 | [第 12 课：Function Calling 与调用关联](docs/03-providers/12-function-calling.md) |
-| 已完成课程 | 第 1～11 课 |
-| 下一课 | 第 13 课：多个工具调用的顺序与并行策略 |
+| 当前课程 | [第 13 课：多个工具调用的顺序与并行策略](docs/03-providers/13-parallel-tool-calls.md) |
+| 已完成课程 | 第 1～12 课 |
+| 下一课 | 第 14 课：流式响应、取消、部分输出和连接中断 |
 
 目前已经完成最小 ReAct 循环、可靠工具系统、Tool Registry、LLM 基础和 Provider Adapter。
-DeepSeek Transport 已完成；当前正在打通 Provider Function Call、本地工具执行与
-`function_call_output` 之间的 call ID 关联。
+DeepSeek Transport 和单个 Function Call 的完整关联已经完成；当前正在把一次 Provider 响应中的
+多个调用建模为批次，并实现默认顺序、显式只读并发和稳定历史归并。
 
 ## 为什么先用 Python
 
@@ -31,12 +31,12 @@ DeepSeek Transport 已完成；当前正在打通 Provider Function Call、本�
 
 ```bash
 uv sync
-uv run pytest tests/test_function_calling.py
+uv run pytest tests/test_parallel_tool_calls.py
 ```
 
-第 12 课测试当前会按设计在三组预留实现入口失败。阅读当前课程后，只修改
-`src/agent_lab/contracts.py`、`src/agent_lab/providers.py` 和 `src/agent_lab/agent.py`。本课测试完全
-离线，不需要 API Key，也不要执行真实 Provider 调用。
+第 13 课测试当前会按设计在三组预留实现入口失败。阅读当前课程后，只修改
+`src/agent_lab/providers.py` 和 `src/agent_lab/agent.py`。本课测试完全离线，不需要 API Key，也不要
+执行真实 Provider 调用。
 
 完整课程已经按能力依赖重构为 13 个阶段。阶段顺序、验收项目和语言选择见
 [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)。当前只需关注正在进行的一课，
@@ -47,10 +47,12 @@ uv run pytest tests/test_function_calling.py
 - [`AGENTS.md`](AGENTS.md)：跨聊天窗口持续生效的项目协作与课程维护约定
 - [`docs/README.md`](docs/README.md)：文档中心、当前课程和分类目录
 - [`docs/00-overview/curriculum.md`](docs/00-overview/curriculum.md)：系统课程总纲与阶段验收
+- [`docs/00-overview/project-flow.md`](docs/00-overview/project-flow.md)：全项目当前实现的端到端流程图
 - [`docs/00-overview/desktop-ui.md`](docs/00-overview/desktop-ui.md)：Desktop 技术选型与架构边界
 - [`docs/03-providers/10-provider-adapter.md`](docs/03-providers/10-provider-adapter.md)：Provider Adapter 与思考题答案
-- [`docs/03-providers/11-deepseek-transport.md`](docs/03-providers/11-deepseek-transport.md)：上一课与思考题答案
-- [`docs/03-providers/12-function-calling.md`](docs/03-providers/12-function-calling.md)：当前课程
+- [`docs/03-providers/11-deepseek-transport.md`](docs/03-providers/11-deepseek-transport.md)：DeepSeek Transport 与思考题答案
+- [`docs/03-providers/12-function-calling.md`](docs/03-providers/12-function-calling.md)：上一课与思考题答案
+- [`docs/03-providers/13-parallel-tool-calls.md`](docs/03-providers/13-parallel-tool-calls.md)：当前课程
 
 ## 参考资料
 

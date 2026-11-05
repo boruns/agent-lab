@@ -8,9 +8,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 当前阶段 | 阶段 3：模型 Provider |
-| 当前课程 | [第 12 课：Function Calling 与调用关联](03-providers/12-function-calling.md) |
-| 已完成 | 环境、ReAct、可靠工具系统、LLM 基本词汇、Provider Adapter、DeepSeek Transport |
-| 下一课 | 第 13 课：多个工具调用的顺序与并行策略 |
+| 当前课程 | [第 13 课：多个工具调用的顺序与并行策略](03-providers/13-parallel-tool-calls.md) |
+| 已完成 | 环境、ReAct、可靠工具系统、LLM 基本词汇、Provider Adapter、DeepSeek Transport、单 Function Call 关联 |
+| 下一课 | 第 14 课：流式响应、取消、部分输出和连接中断 |
 
 运行当前验收：
 
@@ -23,11 +23,12 @@ uv run ruff format --check .
 ## 从哪里开始
 
 1. 先读[系统课程总纲](00-overview/curriculum.md)，了解整体目标和当前阶段；
-2. 阅读当前课程文档，理解“为什么需要这个功能”；
-3. 运行测试观察失败；
-4. 完成练习后再次运行测试；
-5. 让我进行代码审阅，确认实现和回归测试通过；
-6. 开始下一课时，先把本课思考题参考答案写回本课文档，再进入新课。
+2. 查看[项目流程图](00-overview/project-flow.md)，理解当前代码已经形成的完整链路；
+3. 阅读当前课程文档，理解“为什么需要这个功能”；
+4. 运行测试观察失败；
+5. 完成练习后再次运行测试；
+6. 让我进行代码审阅，确认实现和回归测试通过；
+7. 开始下一课时，先补充本课思考题参考答案并更新项目流程图，再进入新课。
 
 ## 目录结构
 
@@ -36,6 +37,7 @@ docs/
 ├── README.md
 ├── 00-overview/                  # 全局约定与课程地图
 │   ├── curriculum.md             # 唯一的完整课程顺序
+│   ├── project-flow.md           # 当前实现的端到端流程图
 │   ├── course-method.md          # 学习方法与工程原则
 │   ├── python-environment.md     # uv 与 Python 环境
 │   ├── model-providers.md        # DeepSeek 优先的 Provider 策略
@@ -54,7 +56,8 @@ docs/
     ├── 09-llm-foundations.md
     ├── 10-provider-adapter.md
     ├── 11-deepseek-transport.md
-    └── 12-function-calling.md
+    ├── 12-function-calling.md
+    └── 13-parallel-tool-calls.md
 ```
 
 未来阶段只在真正开始时创建目录，避免出现大量空目录。
@@ -62,6 +65,7 @@ docs/
 ## 全局文档
 
 - [系统课程总纲](00-overview/curriculum.md)：阶段依赖、完整课序、验收项目和语言选择；
+- [项目流程图](00-overview/project-flow.md)：当前已实现能力的端到端运行链路与边界；
 - [学习方法与工程原则](00-overview/course-method.md)：每课如何学习以及为什么暂不复制 Shannon；
 - [Python 环境管理](00-overview/python-environment.md)：uv、依赖、锁文件和常用命令；
 - [模型 Provider 约定](00-overview/model-providers.md)：DeepSeek 默认、OpenAI 备用和密钥管理。
@@ -88,7 +92,8 @@ docs/
 - [第 9 课：LLM 基本词汇与 Provider 边界](03-providers/09-llm-foundations.md) — 已完成
 - [第 10 课：Provider Adapter 与协议映射](03-providers/10-provider-adapter.md) — 已完成
 - [第 11 课：DeepSeek 基础调用与 Transport 边界](03-providers/11-deepseek-transport.md) — 已完成
-- [第 12 课：Function Calling 与调用关联](03-providers/12-function-calling.md) — 进行中
+- [第 12 课：Function Calling 与调用关联](03-providers/12-function-calling.md) — 已完成
+- [第 13 课：多个工具调用的顺序与并行策略](03-providers/13-parallel-tool-calls.md) — 进行中
 
 ## 文档约定
 
@@ -96,6 +101,7 @@ docs/
 - 阶段目录使用两位数字，课程文件名保留课号；
 - 每篇课程包含问题、作用、实现、验证、思考题；
 - 系统总纲维护完整课序；根目录 `README.md` 与本页同步维护当前课程摘要；
+- 项目流程图维护当前已实现的完整运行链路；每次课程完成验收后必须同步更新；
 - 每次开始或验收一课时，同步检查根 `README.md`、本页、系统总纲中的状态与导航，以及相邻课程的上一课/下一课链接；
 - 开始下一课时，先将上一课所有思考题的参考答案补充到上一课文档；进行中的课程不提前公开答案；
 - 代码路径相对仓库根目录书写，文档链接使用相对路径；

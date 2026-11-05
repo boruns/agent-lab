@@ -140,11 +140,22 @@ class ToolCall:
 
 
 @dataclass(frozen=True)
+class ToolCallBatch:
+    """Two or more tool calls proposed by one model response."""
+
+    calls: tuple[ToolCall, ...]
+
+    def __post_init__(self) -> None:
+        if len(self.calls) < 2:
+            raise ValueError("ToolCallBatch must contain at least two calls")
+
+
+@dataclass(frozen=True)
 class FinalAnswer:
     content: str
 
 
-type Decision = ToolCall | FinalAnswer
+type Decision = ToolCall | ToolCallBatch | FinalAnswer
 
 
 @dataclass(frozen=True)

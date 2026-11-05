@@ -83,24 +83,6 @@ class FunctionCallResponseTests(unittest.TestCase):
                 response["output"][0][field] = ""
                 self.adapter.parse_response(response)
 
-    def test_multiple_function_calls_are_deferred_to_lesson_13(self) -> None:
-        response = function_call_response()
-        response["output"].append(
-            {
-                "type": "function_call",
-                "status": "completed",
-                "call_id": "call_456",
-                "name": "web_dsearch",
-                "arguments": '{"query":"providers"}',
-            }
-        )
-
-        with self.assertRaisesRegex(
-            UnsupportedProviderResponseError,
-            "lesson 13",
-        ):
-            self.adapter.parse_response(response)
-
 
 class FunctionCallHistoryTests(unittest.TestCase):
     def setUp(self) -> None:
